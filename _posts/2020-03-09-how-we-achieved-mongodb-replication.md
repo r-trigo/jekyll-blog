@@ -48,9 +48,24 @@ mongorestore --host=mongodb1.example.net --port=3017 --username=user  --authenti
 ```
 
 ### Problems and limitations found
+1. Machine failure
+  - Late data
+    - since mongodump ran daily during dawn, the data from that time would be lost
+  - Unavailability, mongorestore process time
+    - mongodump and mongorestore in biggest databases took several hours
+2. Horizontal escalation not possible
+
 
 ## After
-
+1. Service fault-tolerance
+  - Automatic and instant writing database switch
+2. Inter-regional cluster
+3. Cluster hierarchy
+4. Data redundancy (instantaneously synced)
+5. Better server performance
+6. Read operations can be balanced through secondary nodes
+  - Dashboard queries and mongodumps
+  
 
 ## Work done
 
