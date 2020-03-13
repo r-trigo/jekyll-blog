@@ -3,7 +3,7 @@ layout: post
 title: How we achieved MongoDB replication
 date: 2020-03-09 23:49 +0000
 ---
-# How we achieved MongoDB replication on Docker
+# :leaves: :sheep: :whale: How we achieved MongoDB replication on Docker
 
 ## Prologue
 Picture your database server. Now imagine it somehow breaks. Dispair comes up and disturbs the reaction.
@@ -56,18 +56,30 @@ mongorestore --host=mongodb1.example.net --port=3017 --username=user  --authenti
 2. Horizontal escalation not possible
 
 
-## After
+## After (filter me)
 1. Service fault-tolerance
   - Automatic and instant writing database switch
+  - provides redundancy
+  - increases data availability
 2. Inter-regional cluster
 3. Cluster hierarchy
 4. Data redundancy (instantaneously synced)
 5. Better server performance
 6. Read operations can be balanced through secondary nodes
   - Dashboard queries and mongodumps
-  
+  - increased read capacity (clients can send read operations to different servers)
+
 
 ## Work done
+- extracted 3 Mongo docker containers from main application server
+- extracted another Mongo docker container from a minor application server
+- assembled a cluster composed of 3 servers in different datacenters and regions
+- planted 4 Mongo containers scaling to 3 on a Mongo cluster
+- merged data from 4 Mongo docker containers into one database
+- migrated backups and change which server they read the data
+- unified backups
+- generated and deploy keyfiles
+- prepared applications for mongo connection string change
 
 
 ## Conclusion
