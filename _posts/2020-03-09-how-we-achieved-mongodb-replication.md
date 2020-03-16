@@ -12,6 +12,10 @@ Maybe you lost data. Maybe you had too much downtime. Maybe you lost work hours.
 High Availability is easily a nice-to-have but in times like these you value it more.
 MongoDB comes with clustering features, which provide more storage capacity (sharding) and more reliability (replication). This article will focus on MongoDB replication on Docker containers.
 
+## :checkered_flag: Objectives
+- Change Mongo data backup strategy from **mongodump/mongorestore** to Mongo Replication
+- Upgrade Mongo v3.4 and v3.6 to v4.2
+
 ## Before
 TODO: diagram
 
@@ -54,6 +58,14 @@ mongorestore --host=mongodb1.example.net --port=3017 --username=user  --authenti
   - Unavailability, mongorestore process time
     - mongodump and mongorestore in biggest databases took several hours
 2. Horizontal escalation not possible
+3. MongoDB starves for RAM
+  - by default, each Mongo container will try to cache all available memory until 60%
+  - since we previously had 1 container on two application servers and 2 containers in the same application server, all of them had at least 60% busy (in use + cached)
+  - whenever there is more than one Mongo container, they will fight for all the available memory trying to reach 60% each (2 -> 120%, 3 -> 180%, 4 -> 240%, etc.)
+  - it is very important to set container memory limits
+4. Mongodumps and Mongorestores were scheduled to run at the same time, causing inode usage alerts
+5. Mongo version 3 lacked Mongo version 4 features
+6. Centralize Docker volumes
 
 
 ## After (filter me)
@@ -80,6 +92,21 @@ mongorestore --host=mongodb1.example.net --port=3017 --username=user  --authenti
 - unified backups
 - generated and deploy keyfiles
 - prepared applications for mongo connection string change
+- define ports
+- deploy existing containers with replSet argument
+
+
+### :v: Final state
+- **Staging** application server should point back to its Mongo instances, without **mongodump**
+- **Production** application servers should point to Mongo Production Cluster using replica set
+- **Mirror** application server should point to to its Mongo instances and keep storing most recent **mongodumps**
+- **Mongo Cluster** secondary node should **mongodump** the cluster data to Mirror environment, asking for it to another secondary node
+
+
+## Strategy uncovered problems
+- On a 3 node cluster, when 2 nodes are offline, the last one enters state "RECOVERING". To keep the service running, enter this instance and remove the remaining nodes from the replica set. There is an an interactive script for this called Mongo Lonely Replica.
 
 
 ## Conclusion
+TODO: Hardware chart screenshots?
+The whole process was done with intervals between major steps, since we wanted to trust the new strategy was working for us. We are very glad to have all the problems in the **after** section solved. There were a lot of reasons to do all of this and we are now prepared to scale easily and sleep well knowing that MongoDB has (at least) database fault-tolerance and recovers by itself instantaneously.
