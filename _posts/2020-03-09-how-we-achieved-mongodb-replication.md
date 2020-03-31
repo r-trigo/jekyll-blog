@@ -18,9 +18,10 @@ We felt the need to improve our production database and data backup strategy as 
 
 
 ## Before
-TODO: diagram
 
 ### Old production environment
+<img src="blog-post-prod-env.png" width="600" height="500" />
+
 **Production servers**
 - server_1: application services containers + 2 mongo containers
 - server_2: application services containers + 1 mongo containers
@@ -29,7 +30,7 @@ TODO: diagram
 **Mirror servers**
 - mirror_server_1: application services containers + 2 mongo containers (updated once a day)
 - mirror_server_2: application services containers + 1 mongo containers (updated once a day)
-- (services and data on server3 were not in mirror environment)
+- (services and data on server_3 were not in mirror environment)
 
 The mongo service was kept using a mongodump/mongorestore strategy.
 
