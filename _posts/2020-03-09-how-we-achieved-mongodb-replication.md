@@ -3,7 +3,8 @@ layout: post
 title: How we achieved MongoDB replication
 date: 2020-03-09 23:49 +0000
 ---
-# :leaves: :sheep: :whale: How we achieved MongoDB replication on Docker
+# How we achieved MongoDB replication on Docker
+:leaves: :sheep: :whale:
 
 ## Prologue
 Picture your database server. Now imagine it somehow breaks. Dispair comes up and disturbs the reaction.
@@ -14,14 +15,13 @@ MongoDB comes with clustering features, which provide more storage capacity (sha
 
 
 ## Motivation
-We felt the need to improve our production database and data backup strategy as we identified it was giving the servers a hard time performance-wise and the disaster recovery process was very hard in most procedures. So, we started to design a migration plan to solve this. Since we were dedicating time and effort into this, we took the chance to upgrade the Mongo version in use, since the version at that time was not updated for a while, which might have been causing security issues, as well as missing new features.
+We felt the need to improve our production database and data backup strategy as we identified it was giving the servers a hard time performance-wise and the disaster recovery process was very hard in most procedures. So, we started to design a migration plan to solve this. We also took the chance to update the Mongo version in use to benefit from new features and security improvements
 
 
 ## Before
+![environment-before](https://i.imgur.com/7zRCbqT.png)
 
 ### Old production environment
-<img src="blog-post-prod-env.png" width="600" height="500" />
-
 **Production servers**
 - server_1: application services containers + 2 mongo containers
 - server_2: application services containers + 1 mongo containers
@@ -44,22 +44,26 @@ The first part of mongodump/mongorestore strategy is composed of cronjobs which 
 mongodump --host=mongodb1.example.net --port=3017 --username=user --password="pass" --out=/opt/backup/mongodump-2013-10-24
 ```
 
+The command above outputs a Mongo data dump file named *mongodump-2013-10-24* on */opt/backup* directory, from the connection to *mongodb1.example.com*.
+
 The second part of this strategy is restoring the second database by the data in the mongodump with mongorestore utility.
 
 ###### mongorestore
 > The mongorestore program loads data from either a binary database dump created by mongodump or the standard input (starting in version 3.0.0) into a mongod or mongos instance.
 
-**WARNING**: The process of mongorestore utility is NOT incremental. Restoring a database will recreate all data.
-
 ```bash
 mongorestore --host=mongodb1.example.net --port=3017 --username=user  --authenticationDatabase=admin /opt/backup/mongodump-2013-10-24
 ```
+
+The command above writes the data from */opt/backup/mongodump-2013-10-24* file to the Mongo instance on the *mongodb1.example.com* connection.
+
+**WARNING**: The process of mongorestore utility is NOT incremental. Restoring a database will delete all data prior to writing the mongodump data.
 
 ### Problems and limitations found
 1. **Late backup data**:
 Since mongodump ran daily during dawn, the data from that time until the moment of the database switch would be lost.
 2. **Unavailability**:
-mongodump and mongorestore in biggest databases took several hours. During the restore of the DB, nothing could be done as it can't be used util mongorestore is finished. Only when completed the DB will be available. Also, switching from production environment to mirror environment was a manual process which took some time.
+The mongodump and mongorestore utilities took several hours to complete in the biggest databases. During the DB restore, nothing could be done as the Mongo data can't be used until mongorestore is finished. The DB will only be available when this is completed. Also, switching from a production environment to a mirror environment was a manual process which took some time.
 3. **High disk usage**:
 Restoring a whole database (or several DBs simultaneously) will take up disks inodes, as well as taking a toll of usage in your disks.
 4. **Scalability limitations**:
@@ -69,16 +73,34 @@ By default, each Mongo container will try to cache all available memory until 60
 6. **Amount of Docker volumes**:
 MongoDB data, dumps and metadata were scattered through several Docker volumes, mapped to different filesystem folders. Merging these databases would allow to centralize this data.
 7. **Security and features**:
-Upgrading to Mongo 4 would solve security issues and bring more features to improve DB performance and replication (fontes? listar features?)
+Upgrading to Mongo 4 would solve security issues and bring more features to improve DB performance and replication, like [non-blocking secondary reads](https://www.mongodb.com/blog/post/mongodb-40-nonblocking-secondary-reads), [transactions and flow control](https://www.percona.com/blog/2019/08/16/long-awaited-mongodb-4-2-ga-has-landed/).
 
 
 ## :checkered_flag: Objectives
-- Upgrade Mongo v3.4 and v3.6 instances to v4.2 (all community edition)
-- Change Mongo data backup strategy from **mongodump/mongorestore** to Mongo Replication
-- Merge Mongo containers into a single container and Mongo Docker volumes into a single volume
+To improve our production database and solve the identified limitations, our most clear objectives at this point were:
+- Upgrading Mongo v3.4 and v3.6 instances to v4.2 (all community edition)
+- Changing Mongo data backup strategy from **mongodump/mongorestore** to Mongo Replication
+- Merging Mongo containers into a single container and Mongo Docker volumes into a single volume
+
+
+##### You can read more about the migration process [here](future).
+### Plan topics
+- prepare applications for mongo connection string change
+- generate and deploy keyfiles
+- deploy existing containers with replSet argument
+- define ports
+- assemble a cluster composed of 3 servers in different datacenters and regions
+- plant 4 Mongo containers scaling to 3 on a Mongo cluster
+- extract 3 Mongo docker containers from main application server
+- extract another Mongo docker container from a minor application server
+- migrate backups and change which server they read the data
+- merge data from 4 Mongo docker containers into one database
+- unify backups
 
 
 ## After
+![environment-before](blog-post-prod-env-after.png)
+
 1. **Fault-tolerance**:
 Automatic and instant primary database switch.
 2. **Data redundancy**:
@@ -92,23 +114,6 @@ Read operations can be balanced through secondary nodes, like dashboards queries
 Applicationss can also be configured (through Mongo connection URI) to perform read operations from secondary nodes, which increases database read capacity.
 6. **Performance**
 Now that memory used and cached is right for the system needs, Mongo databases are hosted in dedicated servers, version got bumped and cluster can balance read operations, performance improvements exceeded the expectations.
-
-
-## (Mr. Reviewer, the migration procedure takes place in another blog post, as we have discussed to link it here in the future)
-
-
-### Plan topics (keep this?)
-- prepare applications for mongo connection string change
-- generate and deploy keyfiles
-- deploy existing containers with replSet argument
-- define ports
-- assemble a cluster composed of 3 servers in different datacenters and regions
-- plant 4 Mongo containers scaling to 3 on a Mongo cluster
-- extract 3 Mongo docker containers from main application server
-- extract another Mongo docker container from a minor application server
-- migrate backups and change which server they read the data
-- merge data from 4 Mongo docker containers into one database
-- unify backups
 
 
 ### :v: New production environment
@@ -153,4 +158,8 @@ rs.reconfig(cfg, {"force": true})
 ## Conclusion
 TODO: Hardware chart screenshots?
 
+This post is more than about MongoDB replication on Docker, it is about a victory on stopping the infrastructure growth on a wrong direction and have things done the way we thought they should be. Like a tree growing on a vase, we should plant it on a garden, where it can grow freely. Now we will watch that tree scale without adding a new vase every time and not be afraid of breaking them. That's what high availability clusters are all about - building an abstract module for application layer which can scale and keep being used the same way.
+
 The whole process was done with intervals between major steps, since we wanted to check if the new strategy was working for us. We are very glad to have all the problems in the **before** section solved. There were a lot of reasons to do all of this and we are now prepared to scale easily and sleep well knowing that MongoDB has (at least) database fault-tolerance and recovers by itself instantaneously which lowers the odds of disaster scenarios.
+
+Stay tuned for part 2, where we’ll explore the whole technical setup.
