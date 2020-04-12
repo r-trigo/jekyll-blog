@@ -117,8 +117,8 @@ Now that memory used and cached is right for the system needs, Mongo databases a
 
 
 ### :v: New production environment
-- **Production** application servers should point to Mongo Production Cluster using replica set
-- **Mirror** application server should point to Mongo Production Clister and keep storing most recent **mongodumps**
+- **Production** application servers should connect to Mongo Production Cluster using replica set
+- **Mirror** application server should connect to Mongo Production Clister and keep storing most recent **mongodumps**
 - **Mongo Cluster** secondary node should **mongodump** the cluster data to Mirror environment, asking for it to another secondary node
 
 
@@ -156,8 +156,6 @@ rs.reconfig(cfg, {"force": true})
 
 
 ## Conclusion
-TODO: Hardware chart screenshots?
-
 This post is more than about MongoDB replication on Docker, it is about a victory on stopping the infrastructure growth on a wrong direction and have things done the way we thought they should be. Like a tree growing on a vase, we should plant it on a garden, where it can grow freely. Now we will watch that tree scale without adding a new vase every time and not be afraid of breaking them. That's what high availability clusters are all about - building an abstract module for application layer which can scale and keep being used the same way.
 
 The whole process was done with intervals between major steps, since we wanted to check if the new strategy was working for us. We are very glad to have all the problems in the **before** section solved. There were a lot of reasons to do all of this and we are now prepared to scale easily and sleep well knowing that MongoDB has (at least) database fault-tolerance and recovers by itself instantaneously which lowers the odds of disaster scenarios.
