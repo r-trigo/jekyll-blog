@@ -84,15 +84,15 @@ And to get to these objectives, we defined the following plan:
 ### Plan topics
 
 - Prepare applications for Mongo connection string change;
-- Generate and deploy keyfiles;
-- Deploy existing containers with replSet argument;
-- Define ports;
 - Assemble a cluster composed of 3 servers in different datacenters and regions;
-- Plant 4 Mongo containers scaling to 3 on a Mongo cluster;
-- Extract 3 Mongo Docker containers from main application server;
-- Extract another Mongo Docker container from a minor application server;
+- Generate and deploy keyfiles on the filesystems;
+- Redeploy existing Mongo Docker containers with *replSet* argument;
+- Define network ports;
+- Deploy new 4 Mongo containers scaling to 3 (4 x 3 = 12) on a Mongo cluster;
+- Add new Mongo instances to the replica set to sync from old Mongo containers;
+- Stop Mongo containers from application servers and remove them from the replica set;
 - Migrate backups and change which server they read the data;
-- Merge data from 4 Mongo Docker containers into one database;
+- Merge data from 4 Mongo containers into one database;
 - Unify backups.
 
 **We will publish a second part of this tutorial soon, where we will go through each of these topics.**
