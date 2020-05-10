@@ -4,70 +4,77 @@ title: How to achieve Mongo replication on Docker
 date: 2020-04-05 18:44 +0100
 ---
 
-# How to achieve Mongo replication on Docker
 ## Prologue
-In the [previous post](2020-03-09-how-we-achieved-mongodb-replication.md), we showed how we used MongoDB replication to solve several problems we were facing before adopting it. Replication got to be a part of a bigger migration which brought stability, fault-tolerance and performance to our systems. In this post we will dive into the practical preparation of that migration.
 
+In the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), we showed how we used MongoDB replication to solve several problems we were facing.
 
-## Motivation (para além da mesma do post anterior)
+Replication got to be a part of a bigger migration which brought stability, fault-tolerance, and performance to our systems. In this post, we will dive into the practical preparation of that migration.
+
+## Motivation
+
 I noticed the lack of tutorials of setting up Mongo replication on Docker containers and wanted to fill this gap along with some tests to see how a Mongo cluster behaves on specific scenarios.
 
+## Objectives
 
-## Objectives (igual ao post anterior)
->To improve our production database and solve the identified limitations, our most clear objectives at this point were:
->- Upgrading Mongo v3.4 and v3.6 instances to v4.2 (all community edition)
->- Changing Mongo data backup strategy from ```mongodump```/```mongorestore``` to Mongo Replication
->- Merging Mongo containers into a single container and Mongo Docker volumes into a single volume
+To improve our production database and solve the identified limitations, our most clear objectives at this point were:
 
-## Procedure steps (não soa muito bem :smile:)
-1. prepare applications for Mongo connection string change
+- Upgrading Mongo v3.4 and v3.6 instances to v4.2 (all community edition);
+- Evolving Mongo data backup strategy from `mongodump`/`mongorestore` on a mirror server to Mongo Replication (active working backup server);
+- Merging Mongo Docker containers into a single container and Mongo Docker volumes into a single volume.
 
-Needs change over time. When our applications were developed, there was no need to pass the Mongo connection URI through a variable, as most of the times Mongo was deployed as a microservice in the same stack as the application containers. With the centralization of Mongo databases, this change was introduced in the application code to update the variable on our CI/CD software whenever we need.
+## Step-by-step
 
-2. generate and deploy keyfiles
+### 1. Prepare applications for Mongo connection string change
 
-[MongoDB official documentation](https://docs.mongodb.com/manual/tutorial/enforce-keyfile-access-control-in-existing-replica-set/) has step-by-step instructions on how to setup Keyfile authentication on a Mongo Cluster. Using keyfile authentication enforces [Transport Encryption](https://docs.mongodb.com/manual/core/security-transport-encryption/) over SSL.
+When our applications were developed, there was no need to pass the Mongo connection URI through a variable, as most of the time Mongo was deployed as a microservice in the same stack as the application containers. With the centralization of Mongo databases, this change was introduced in the application code to update the variable on our CI/CD software whenever we need.
+
+### 2. Generate and deploy keyfiles
+
+[MongoDB’s official documentation](https://docs.mongodb.com/manual/tutorial/enforce-keyfile-access-control-in-existing-replica-set/) has step-by-step instructions on how to setup Keyfile authentication on a Mongo Cluster. Using keyfile authentication enforces [Transport Encryption](https://docs.mongodb.com/manual/core/security-transport-encryption/) over SSL.
 
 ```bash
 openssl rand -base64 756 > <path-to-keyfile>
 chmod 400 <path-to-keyfile>
 ```
 
-The keyfile is passed through ```keyfile``` argument on ```mongod``` command, as shown in the next step.
+The keyfile is passed through a `keyfile` argument on the `mongod` command, as shown in the next step.
 
-3. deploy existing containers with ```replSet``` argument
+[User authentication](https://docs.mongodb.com/manual/tutorial/enable-authentication) and role management is out of the scope of this post, but if you are going to use it, configure it before proceeding beyond this step.
+
+### 3. Deploy existing containers with the `replSet` argument
 
 ```bash
 mongod --keyfile /keyfile --replSet=rs-myapp
 ```
 
-4. define ports
+### 4. Define ports
 
-Simply choose a server network port to serve your Mongo DB. 27017 is Mongo default port, but since in our case we had 4 apps in our production environment, we defined 4 host ports. Choose a network port per Mongo Docker container and stick with them.
+Typically, in this step, you simply choose a server network port to serve your MongoDB. Mongo’s default port is 27017, but since in our case we had 4 apps in our production environment, we defined 4 host ports. You should always choose a network port per Mongo Docker container and stick with them.
+
 - 27001 for app 1
 - 27002 for app 2
 - 27003 for app 3
 - 27004 for app 4
 
-At step 12, after having replication working, we'll only use and expose one.
+At step 12, after having replication working, we'll only use and expose one port.
 
-5. assemble a cluster composed of 3 servers in different datacenters and regions
+### 5. Assemble a cluster composed of 3 servers in different datacenters and regions
 
-Preferably, setup 3 servers on different datacenters, or different regions if possible. This will allow inter-regional availability. Aside from latency changes, your system will survive datacenter blackouts and disasters.
+Preferably, set up 3 servers on different datacenters, or different regions if possible. This will allow for inter-regional availability. Aside from latency changes, your system will survive datacenter blackouts and disasters.
 
 Why 3? It is the minimum number for a worthy Mongo cluster.
 
-1 node: can't have high availability by itself
-2 nodes: no automatic failover - when one of them fails, the other one can't elige itself as primary alone
-3 nodes: minumum worth number - when one of them fails, the other two vote the next primary node
-4 nodes: same benefits as 3 nodes plus one extra copy of data, but pricier
-5 nodes: can whitstand 2 nodes failure at the same time, but even pricier
+- 1 node: can't have high availability by itself;
+- 2 nodes: no automatic failover - when one of them fails, the other one can't elect itself as primary alone;
+- 3 nodes: minimum worth number - when one of them fails, the other two vote for the next primary node;
+- 4 nodes: has the same benefits as 3 nodes plus one extra copy of data (pricier);
+- 5 nodes: can withstand 2 nodes failure at the same time (even pricier).
 
 There are Mongo clusters with [arbiters](https://docs.mongodb.com/manual/core/replica-set-arbiter/), but that is out of the scope of this post.
 
-6. Define your replica set members priorities
+### 6. Define your replica set members’ priorities
 
-Adjust your priorities to your cluster size, hardware, location or other useful criteria.
+Adjust your priorities to your cluster size, hardware, location, or other useful criteria.
 
 In our case, we went for:
 ```js
@@ -77,72 +84,76 @@ node2: 2 // designated first secondary being promoted
 node3: 1 // designated second secondary being promoted
 ```
 
-We set the node who currently had the data with ```priority: 10```, since it had to be the primary in the sync phase, while the rest of the cluster is not ready. This allowed to continue serving database queries while data was being replicated.
+We set the node which currently had the data with `priority: 10`, since it had to be the primary in the sync phase, while the rest of the cluster is not ready. This allowed continuing serving database queries while data was being replicated.
 
-7. deploy Mongo containers scaling to N on a Mongo cluster
+### 7. Deploy Mongo containers scaling to N* on a Mongo cluster
 
-(being N the number of Mongo cluster nodes)
+(\*N being the number of Mongo cluster nodes).
 
-Use an orchestrator to deploy 4 mongo containers, scaling to 3, having 4 on each host.
-4 is the number of Mongo containers
-3 is the number of Mongo cluster nodes
-In our case this meant having 12 containers temporarily.
+Use an orchestrator to deploy 4 Mongo containers in the environment, scaling to 3.
+
+- 4 is the number of different Mongo instances;
+- 3 is the number of Mongo cluster nodes.
+
+In our case, this meant having 12 containers in the environment temporarily.
 
 TODO: Diagram
 
 Remember to deploy them as replica set members, as shown in step 3.
 
-8. Replication time!
+### 8. Replication time!
 
-This is the moment when we start watching database users and collection data getting synced. You can enter the ```mongo``` shell of a Mongo container (preferably primary) to check replication progress. These two commands will show you the status, priority and other useful info:
+This is the moment when we start watching database users and collection data getting synced. You can enter the `mongo` shell of a Mongo container (preferably primary) to check the replication progress. These two commands will show you the status, priority and other useful info:
 ```bash
 rs.status()
 # and
 rs.conf()
-```  
+```
 
-When all members reach secondary state, you can start testing. Stop the primary node to witness secondary promotion. This process is almost instantaneous.
+When all members reach the secondary state, you can start testing. Stop the primary node to witness secondary promotion. This process is almost instantaneous.
 
-You can stop primary member by issuing the following command:
+You can stop the primary member by issuing the following command:
+
 ```bash
 docker stop <mongo_docker_container_name_or_d>
 ```
 
-When you bring it back online, the cluster will give back primary role to the member with the highest ```priority```. This process takes a few seconds, as it is not critical.
+When you bring it back online, the cluster will give back the primary role to the member with the highest `priority`. This process takes a few seconds, as it is not critical.
 
 ```bash
-docker start <mongo_docker_container_name_or_d>
+docker start <mongo_docker_container_name_or_id>
 ```
 
-9. extract Mongo containers from application servers
+### 9. Extract Mongo containers from application servers
 
-If everything is working at this point, you can stop the Mongo instance which we set ```priority: 10``` (stop command in the prior step) and [remove that member from the replica set passing its hostname as parameter](https://docs.mongodb.com/manual/reference/method/rs.remove/).
+If everything is working at this point, you can stop the Mongo instance on which we previously set `priority: 10` (stop command in the prior step) and [remove that member from the replica set passing its hostname as parameter](https://docs.mongodb.com/manual/reference/method/rs.remove/).
 
 Repeat this step for every Mongo container you had on step 4.
 
-11. migrate backups and change which server they read the data
+### 11. Migrate backups and change which server they read the data from
 
-Like mentioned in the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), one handy feature of MongoDB replication is having a secondary member asking for data to ```mongodump``` from another secondary member.
+As mentioned in the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), one handy feature of MongoDB replication is having a secondary member asking for data to `mongodump` from another secondary member.
 
-Previously, we had the application + database server performing ```mongodump``` of its data. As we moved the data to the cluster, we also moved the automated backup tools to a secondary member, to take advantage from said feature.
+Previously, we had the application + database server performing `mongodump` of its data. As we moved the data to the cluster, we also moved the automated backup tools to a secondary member, to take advantage of said feature.
 
-12. merge data from 4 Mongo docker containers into one database
+### 12. Merge data from 4 Mongo Docker containers into one database
 
-If you only had 1 Mongo Docker container at the start, skip to step 13.
+**If you only had 1 Mongo Docker container at the start, skip to step 13.**
 
-Besides having simplicity telling us to do this BEFORE step 1, we decided to act cautiously and keep apps and databases working in a way as close as they were before until we mastered Mongo replication on our environment.
+Besides having simplicity telling us to do this **before** step 1, we decided to act cautiously and keep apps and databases working in a way as close as they were before until we mastered Mongo replication in our environment.
 
-At this stage, we chose the Mongo with the most data to import data from the others into it. When working with MongoDB, remember this line from the [official docs](https://docs.mongodb.com/manual/core/databases-and-collections/):
->In MongoDB, databases hold collections of documents.
+At this stage, we chose to import data from all Mongo databases to a single Mongo database - the one which contained the most data. When working with MongoDB, remember this line from the [official docs](https://docs.mongodb.com/manual/core/databases-and-collections/):
 
-That means we can take advantage of ```mongodump --db <dbname>``` and ```mongorestore --db <dbname>``` to merge Mongo data into the same instance (this goes for non-Docker as well).
+> In MongoDB, databases hold collections of documents.
 
-13. Monitor cluster nodes and backups
+That means we can take advantage of `mongodump --db <dbname>` and `mongorestore --db <dbname>` to merge Mongo data into the same instance (this goes for non-Docker as well).
 
-When you have merged your databases into the same instance you will shut down other instances, right? Then you will only need to monitor the application and perform backups of that same instance. Don't forget to monitor the new cluster hardware. Even with automatic fault-tolerance, it is not recommended to have our systems with "one leg short".
+### 13. Monitor cluster nodes and backups
+
+When you have merged your databases into the same instance, you will shut down other instances, right? Then, you will only need to monitor the application and perform backups of that same instance. Don't forget to monitor the new cluster hardware. Even with automatic fault-tolerance, it is not recommended to leave our systems short. As a hint, there is a [dedicated role for that](https://docs.mongodb.com/manual/reference/built-in-roles/#clusterMonitor) called `clusterMonitor`.
 
 ## Conclusion
 
-Sharing this story about our database migration will hopefully help the community, that is not taking full benefits from MongoDB already, to start seeing MongoDB in a more mature and reliable way.
+Sharing this story about our database migration will hopefully help the community - especially those not taking full benefits from MongoDB already - to start seeing MongoDB in a more mature and reliable way.
 
-Even this is not a regular MongoDB replication "how to" tutorial, this story of our database migration shows us important details about MongoDB internal features, our struggle to not leave anything behind and again, the benefits of such technology. That's what I believe technology is for - helping humans with their needs.
+Even though this is not a regular MongoDB replication "how-to" tutorial, this story shows important details about MongoDB’s internal features, our struggle to not leave any details behind, and, again, the benefits of such technology. That's what I believe technology is for - helping humans with their needs.
