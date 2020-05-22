@@ -97,7 +97,7 @@ Use an orchestrator to deploy 4 Mongo containers in the environment, scaling to 
 
 In our case, this meant having 12 containers in the environment temporarily.
 
-TODO: Diagram
+![environment-middlestep](https://res.cloudinary.com/practicaldev/image/fetch/s--R-MP1A78--/c_limit%2Cf_auto%2Cfl_progressive%2Cq_auto%2Cw_880/https://blog.jscrambler.com/content/images/2020/05/jscrambler-blog-how-to-achieve-mongodb-replication-docker-env.png)
 
 Remember to deploy them as replica set members, as shown in step 3.
 
@@ -130,13 +130,13 @@ If everything is working at this point, you can stop the Mongo instance on which
 
 Repeat this step for every Mongo container you had on step 4.
 
-### 11. Migrate backups and change which server they read the data from
+### 10. Migrate backups and change which server they read the data from
 
 As mentioned in the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), one handy feature of MongoDB replication is having a secondary member asking for data to `mongodump` from another secondary member.
 
 Previously, we had the application + database server performing `mongodump` of its data. As we moved the data to the cluster, we also moved the automated backup tools to a secondary member, to take advantage of said feature.
 
-### 12. Merge data from 4 Mongo Docker containers into one database
+### 11. Merge data from 4 Mongo Docker containers into one database
 
 **If you only had 1 Mongo Docker container at the start, skip to step 13.**
 
@@ -148,7 +148,7 @@ At this stage, we chose to import data from all Mongo databases to a single Mong
 
 That means we can take advantage of `mongodump --db <dbname>` and `mongorestore --db <dbname>` to merge Mongo data into the same instance (this goes for non-Docker as well).
 
-### 13. Monitor cluster nodes and backups
+### 12. Monitor cluster nodes and backups
 
 When you have merged your databases into the same instance, you will shut down other instances, right? Then, you will only need to monitor the application and perform backups of that same instance. Don't forget to monitor the new cluster hardware. Even with automatic fault-tolerance, it is not recommended to leave our systems short. As a hint, there is a [dedicated role for that](https://docs.mongodb.com/manual/reference/built-in-roles/#clusterMonitor) called `clusterMonitor`.
 
