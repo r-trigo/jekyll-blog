@@ -1,0 +1,11 @@
+- layout: left
+  company: Jscrambler
+  link: jscrambler.com
+  job_title: DevOps Engineer
+  dates: June 2019 - Present
+  quote: >
+    Jscrambler is the Leading Solution for JavaScript In-App Protection and Real-Time Monitoring
+  description: |
+    - Develop configuration management scripts to promote infrastructure automation
+    - Redesign, maintain and monitor cloud and local infrastructure
+    - Continuous Integration and Continuous Delivery

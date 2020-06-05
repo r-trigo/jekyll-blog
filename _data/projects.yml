@@ -1,0 +1,9 @@
+- layout: top-middle
+  name: Jeksite
+  link: github.com/r-trigo
+  github: r-trigo/rt-jekyll-website
+  quote: >
+    This project is materialized in this very same website you're surfing right now.
+  description: |
+    Always wanted my own website. Took Jekyll for a try. Ended up posting my tech articles on it.
+    Check more of my projects Ion my GitHub profile.

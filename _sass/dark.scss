@@ -1,0 +1,20 @@
+.dark {
+  background-color: #2D2D2D;
+  color: #e6e6e6;
+}
+
+.dark {
+  mark {
+    color: #2D2D2D;
+    background-color: #e6e6e6;
+  }
+
+  a {
+    color: $link-color;
+
+    &:hover {
+      color: $hover-color;
+      text-decoration: none;
+    }
+  }
+}
