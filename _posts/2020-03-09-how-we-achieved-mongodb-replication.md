@@ -2,11 +2,11 @@
 layout: post
 title: How we achieved MongoDB replication
 date: 2020-03-09 23:49 +0000
+categories: data devops docker mongodb
 ---
-# How we achieved MongoDB replication on Docker
-:leaves: :sheep: :whale:
+# :leaves: :sheep: :whale:
 
-## Prologue
+# Prologue
 
 Picture your database server. Now imagine it somehow breaks. Despair comes up and disturbs the reaction.
 
@@ -14,13 +14,13 @@ Maybe you lost data. Maybe you had too much downtime. Maybe you lost work hours.
 
 MongoDB comes with clustering features that provide more storage capacity (sharding) and more reliability (replication). This article will focus on MongoDB replication on Docker containers.
 
-## Motivation
+# Motivation
 
 We felt the need to improve our production database and data backup strategy as we identified it was giving the servers a hard time performance-wise and the disaster recovery process was very hard in most procedures.
 
 So, we started to design a migration plan to solve this. We also took the chance to update the Mongo version in use to benefit from new features and security improvements
 
-## Before
+# Before
 ![environment-before](https://i.imgur.com/7zRCbqT.png)
 
 ### Old Production Environment
@@ -71,7 +71,7 @@ The command above writes the data from */opt/backup/mongodump-2013-10-24* file t
 7. **Security and features**: Upgrading to Mongo 4 would solve security issues and bring more features to improve DB performance and replication, like [non-blocking secondary reads](https://www.mongodb.com/blog/post/mongodb-40-nonblocking-secondary-reads), [transactions and flow control](https://www.percona.com/blog/2019/08/16/long-awaited-mongodb-4-2-ga-has-landed/).
 
 
-## Objectives
+# Objectives
 
 To improve our production database and solve the identified limitations, our most clear objectives at this point were:
 
@@ -97,7 +97,7 @@ And to get to these objectives, we defined the following plan:
 
 **We will publish a second part of this tutorial soon, where we will go through each of these topics.**
 
-## Results
+# Results
 
 Some of the achieved results were:
 
@@ -115,7 +115,7 @@ Some of the achieved results were:
 
 ![environment-after](https://i.imgur.com/RLskS58.png)
 
-## Conclusion
+# Conclusion
 
 This post is more than about MongoDB replication on Docker. It is about a victory in stopping the infrastructure growth going in the wrong direction and having things done the way we thought they should be.
 
@@ -126,3 +126,5 @@ The whole process was done with intervals between major steps, to allow checking
 Achieving this means that we are now prepared to scale easily and sleep well knowing that MongoDB has (at least) database fault-tolerance and recovers by itself instantaneously — which lowers the odds of disaster scenarios.
 
 Stay tuned for part 2, where we’ll explore the whole technical setup.
+
+<link rel="canonical" href="https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/" />

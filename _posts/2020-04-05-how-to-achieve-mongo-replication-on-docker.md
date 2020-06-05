@@ -2,19 +2,21 @@
 layout: post
 title: How to achieve Mongo replication on Docker
 date: 2020-04-05 18:44 +0100
+categories: data devops docker mongodb
 ---
+# :leaves: :sheep: :whale:
 
-## Prologue
+# Prologue
 
 In the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), we showed how we used MongoDB replication to solve several problems we were facing.
 
 Replication got to be a part of a bigger migration which brought stability, fault-tolerance, and performance to our systems. In this post, we will dive into the practical preparation of that migration.
 
-## Motivation
+# Motivation
 
 I noticed the lack of tutorials of setting up Mongo replication on Docker containers and wanted to fill this gap along with some tests to see how a Mongo cluster behaves on specific scenarios.
 
-## Objectives
+# Objectives
 
 To improve our production database and solve the identified limitations, our most clear objectives at this point were:
 
@@ -22,7 +24,7 @@ To improve our production database and solve the identified limitations, our mos
 - Evolving Mongo data backup strategy from `mongodump`/`mongorestore` on a mirror server to Mongo Replication (active working backup server);
 - Merging Mongo Docker containers into a single container and Mongo Docker volumes into a single volume.
 
-## Step-by-step
+# Step-by-step
 
 ### 1. Prepare applications for Mongo connection string change
 
@@ -157,3 +159,5 @@ When you have merged your databases into the same instance, you will shut down o
 Sharing this story about our database migration will hopefully help the community - especially those not taking full benefits from MongoDB already - to start seeing MongoDB in a more mature and reliable way.
 
 Even though this is not a regular MongoDB replication "how-to" tutorial, this story shows important details about MongoDB’s internal features, our struggle to not leave any details behind, and, again, the benefits of such technology. That's what I believe technology is for - helping humans with their needs.
+
+<link rel="canonical" href="https://blog.jscrambler.com/how-to-achieve-mongo-replication-on-docker/" />
