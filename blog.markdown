@@ -9,7 +9,7 @@ permalink: /blog/
     <li>
       <span class="post-meta">{{ post.date | date: "%-d %B %Y" }}</span>
       <h3>
-        <a class="post-link" href="{{ post.url }}">{{ post.title }}</a>
+        <a class="post-link" href="{{ post.url | relative_url }}">{{ post.title }}</a>
       </h3>
     </li>
   {% endfor %}

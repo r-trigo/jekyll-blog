@@ -6,4 +6,4 @@ layout: home
 title: Welcome to my Jekyll Site
 ---
 
-My name is Rui Trigo and I'm a DevOps Engineer. In this website you can read about software, hardware and <a href="{{ site.baseurl }}/about"> learn more about my work </a>.
+My name is Rui Trigo and I'm a DevOps Engineer. In this website you can read about software, hardware and <a href="{{ site.baseurl }}about"> learn more about my work </a>.
