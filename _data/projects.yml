@@ -1,7 +1,7 @@
 - layout: top-middle
   name: RT Jekyll Site
   link: github.com/r-trigo
-  github: r-trigo/rt-jekyll-website
+  github: r-trigo/rt-jekyll-site
   quote: >
     This project is materialized in this very same website you're surfing right now.
   description: |
