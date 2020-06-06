@@ -15,4 +15,4 @@ permalink: /blog/
   {% endfor %}
 </ul>
 
-<a href="/">Back to Home Page</a>
+<a href="{{ site.url }}">Back to Home Page</a>

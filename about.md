@@ -4,4 +4,4 @@ title: About
 permalink: /about/
 ---
 
-<a href="/">Back to Home Page</a>
+<a href="{{ site.url }}">Back to Home Page</a>
