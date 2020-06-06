@@ -11,7 +11,7 @@ instagram_username: ru1tr1go
 linkedin_username:  r-trigo
 stackoverflow_username: "6460173"
 
-base_url: "/rt-jekyll-website"
+baseurl: "/rt-jekyll-website"
 
 # About Section
 # about_title: About Me (Use this to override about section title)
