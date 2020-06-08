@@ -6,12 +6,13 @@ email: ruimigueltrigo@gmail.com
 description: >-
   Welcome to RT Jekyll Site. Here you can find my writing work as well as professional info about me.
 
+dev_username: rtrigo
 github_username:  r-trigo
 instagram_username: ru1tr1go
 linkedin_username:  r-trigo
 stackoverflow_username: "6460173"
 
-baseurl: "/rt-jekyll-site/"
+#baseurl: "/rt-jekyll-site/"
 #url: "r-trigo.github.io"
 
 # About Section
