@@ -12,7 +12,8 @@ instagram_username: ru1tr1go
 linkedin_username:  r-trigo
 stackoverflow_username: "6460173"
 
-#baseurl: "/rt-jekyll-site/"
+# comment for local development
+baseurl: "/rt-jekyll-site/"
 #url: "r-trigo.github.io"
 
 # About Section
