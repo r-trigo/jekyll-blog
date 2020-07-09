@@ -32,3 +32,5 @@ gem "wdm", "~> 0.1.1", :install_if => Gem.win_platform?
 
 # bundler
 gem "bundler", "~> 2.1.4"
+# sass
+gem 'sassc', '~> 2.4'
