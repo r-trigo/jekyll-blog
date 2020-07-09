@@ -1,0 +1,246 @@
+---
+layout: post
+title: How to build a fault tolerant PostgreSQL cluster
+---
+:elephant: :collision: :ok_hand:
+
+# Prologue
+- when developing, being close to production state is good
+- We were studying the alternatives
+
+# Motivation
+- Vagrant for single command deployment
+- Ansible can be used for production
+
+# Objectives
+Build a local development environment PostgreSQL cluster with fault tolerance capabilites.
+
+# Pre-requisites
+Install [Vagrant][1], [VirtualBox][2] and [Ansible][3]
+```bash
+sudo apt install vagrant
+sudo apt install virtualbox && sudo apt install virtualbox-dkms
+sudo apt install ansible
+```
+
+**Note**: An alternative to install Ansible on your host machine would be using `ansible-local` Vagrant provider, which needs Ansible installed on the generated virtual machine instead.
+
+# Step-by-step
+## 1. Write a Vagrantfile
+
+You can use `vagrant init` to generate the file or simply create it and insert our first blocks.
+
+```ruby
+Vagrant.configure("2") do |config|
+  (1..3).each do |n|
+    config.vm.define "node#{n}" do |define|
+      define.ssh.insert_key = false
+      define.vm.box = "ubuntu/bionic64"
+      define.vm.hostname = "node#{n}"
+      define.vm.network :private_network, ip: "172.16.1.1#{n}"
+
+      define.vm.provider :virtualbox do |v|
+        v.cpus = 2
+        v.memory = 1024
+        v.name = "node#{n}"
+      end
+    end
+  end
+end
+```
+
+Let's go block by block:
+  - the 1st block is where we setup Vagrant version
+  - on the 2nd block we iterate the following code so we reuse it to generate 3 equal VMs
+  - OS, hostname and network settings are set in the 3rd block
+  - the 4th block is for VirtualBox specific settings
+
+You can create the servers with:
+```bash
+# create all 3 VMs
+vagrant up
+# or create only a specific VM
+vagrant up node1
+```
+
+## 2. Add a provisioner
+
+The first step alone can launch 3 working virtual machines by itself. A little exciting, but the best is yet to come. It is a nice feature of Vagrant launching virtual machines, but we want this servers to have **PostgreSQL** and **repmgr** configured, so we will use a configuration management software to help us. This is the moment **Ansible** walks in to amaze.
+
+Vagrant supports several providers, two of them being [Ansible][4] and [Ansible Local][5]. The difference between them is where Ansible runs, or in other words, where it must be installed. By Vagrant terms, Ansible provider runs on host machine (your computer) and Ansible Local provider runs on guest machines (virtual machines). As we already installed Ansible in the pre-requisites section, we'll go with the first option.
+
+Let's add a block for this provisioner in our `Vagrantfile`.
+
+```ruby
+Vagrant.configure("2") do |config|
+  (1..3).each do |n|
+    config.vm.define "node#{n}" do |define|
+      define.ssh.insert_key = false
+      define.vm.box = "ubuntu/bionic64"
+      define.vm.hostname = "node#{n}"
+      define.vm.network :private_network, ip: "172.16.1.1#{n}"
+
+      define.vm.provider :virtualbox do |v|
+        v.cpus = 2
+        v.memory = 1024
+        v.name = "node#{n}"
+      end
+
+      if n == 3
+        define.vm.provision :ansible do |ansible|
+          ansible.limit = "all"
+          ansible.playbook = "provisioning/playbook.yaml"
+
+          ansible.host_vars = {
+            "node1" => {:connection_host => "172.16.1.11",
+                        :node_id => 1,
+                        :role => "primary" },
+
+            "node2" => {:connection_host => "172.16.1.12",
+                        :node_id => 2,
+                        :role => "standby" },
+
+            "node3" => {:connection_host => "172.16.1.13",
+                        :node_id => 3,
+                        :role => "witness" }
+          }
+        end
+      end
+
+    end
+  end
+end
+```
+
+**Ansible** allows us to configure several servers simultaneously. To take advantage of this feature on **Vagrant**, we add `ansible.limit = "all"` and must wait for all 3 VMs are up. **Vagrant** knows they are all created because of the condition `if n == 3` which makes **Ansible** only run after **Vagrant** iterated 3 times.
+
+`ansible.playbook` if the configuration entrypoint and `ansible.host_vars` is the **Ansible** host variables to use on the tasks and templates we are about to create.
+
+## 3. Create an organized Ansible folder structure
+
+If you're already familiar with **Ansible**, there's little to learn in this section. For those who aren't, it doesn't get too complicated.
+
+First, we have a folder for all Ansible files, named `provisioning`.
+Inside this folder there is our before mentioned entrypoint `playbook.yaml`, a `group_vars` folder for **Ansible** group variables and a `roles` folder.
+
+We could have all **Ansible** tasks within `playbook.yaml`, but role folder structure helps getting organized. In can read [Ansible documentation][6] to learn the best practices. Below you will find the folder structure for this tutorial.
+
+```bash
+project_root
+| provisioning
+|  |  group_vars
+|  |  |  all.yaml
+|  |  roles
+|  |  |  postgres_12
+|  |  |  |  tasks
+|  |  |  |  |  main.yaml
+|  |  |  |  templates
+|  |  |  registration
+|  |  |  |  tasks
+|  |  |  |  |  main.yaml
+|  |  |  repmgr
+|  |  |  |  tasks
+|  |  |  |  |  main.yaml
+|  |  |  |  templates
+|  |  |  ssh
+|  |  |  |  files
+|  |  |  |  tasks
+|  |  |  |  |  main.yaml
+|  |  playbook.yaml
+|  Vagrantfile
+```
+
+## 4. Ansible roles
+#### 4.1 PostgreSQL role
+To configure repmgr on PostgreSQL, we need to edit two well known PostgreSQL configuration files: `postgresql.conf` and `pg_hba.conf`. We will then write our tasks to apply the configurations on `tasks/main.yaml`. I named PostgreSQL role folder as postgres_12 so you can easily use another version if you want to.
+
+##### 4.1.1 User access configuration
+
+You can reuse the default file which comes with PostgreSQL installation and add then whitelist `repmgr` database sessions from your trusted VMs. Create an Ansible template file ([Jinja2 format][7]) like so:
+
+```jinja
+# default configuration (...)
+
+# repmgr
+local   replication   repmgr                              trust
+host    replication   repmgr      127.0.0.1/32            trust
+host    replication   repmgr      {{ node1_ip }}/32       trust
+host    replication   repmgr      {{ node2_ip }}/32       trust
+host    replication   repmgr      {{ node3_ip }}/32       trust
+
+local   repmgr        repmgr                              trust
+host    repmgr        repmgr      127.0.0.1/32            trust
+host    repmgr        repmgr      {{ node1_ip }}/32       trust
+host    repmgr        repmgr      {{ node2_ip }}/32       trust
+host    repmgr        repmgr      {{ node3_ip }}/32       trust
+```
+
+#### 4.1.2 Database configuration
+
+In the same fashion as `pg_hba.conf`, you can reuse `postgresql.conf` default file and add a few more replication related settings on the bottom of the file:
+
+```jinja
+# default configuration (...)
+
+# repmgr
+listen_addresses = '*'
+shared_preload_libraries = 'repmgr'
+wal_level = replica
+max_wal_senders = 5
+wal_keep_segments = 64
+max_replication_slots = 5
+hot_standby = on
+wal_log_hints = on
+```
+
+##### 4.1.3 Task list
+
+These tasks will install PostgreSQL and apply our configurations. Their names are self-explanatory.
+
+```yaml
+- name: Add PostgreSQL apt key
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+- name: Add PostgreSQL repository
+  apt_repository:
+    # ansible_distribution_release = xenial, bionic, focal
+    repo: deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main
+
+- name: Install PostgreSQL 12
+  apt:
+    name: postgresql-12
+    update_cache: yes
+
+- name: Copy database configuration
+  template:
+    src: full_postgresql.conf.j2
+    dest: /etc/postgresql/12/main/postgresql.conf
+    group: postgres
+    mode: '0644'
+    owner: postgres
+
+- name: Copy user access configuration
+  template:
+    src: pg_hba.conf.j2
+    dest: /etc/postgresql/12/main/pg_hba.conf
+    group: postgres
+    mode: '0640'
+    owner: postgres
+```
+
+#### 4.2 SSH server configuration
+
+#### 4.3 repmgr installation
+
+#### 4.4 repmgr node registration
+
+# TODO: Link GitHub repo
+
+[1]: https://www.vagrantup.com/
+[2]: https://www.virtualbox.org/
+[3]: https://www.ansible.com/
+[4]: https://www.vagrantup.com/docs/provisioning/ansible.html
+[5]: https://www.vagrantup.com/docs/provisioning/ansible_local
+[6]: https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html#directory-layout
+[7]: https://docs.ansible.com/ansible/latest/user_guide/playbooks_templating.html
