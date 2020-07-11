@@ -132,20 +132,9 @@ project_root
 |  |  |  all.yaml
 |  |  roles
 |  |  |  postgres_12
-|  |  |  |  tasks
-|  |  |  |  |  main.yaml
-|  |  |  |  templates
 |  |  |  registration
-|  |  |  |  tasks
-|  |  |  |  |  main.yaml
 |  |  |  repmgr
-|  |  |  |  tasks
-|  |  |  |  |  main.yaml
-|  |  |  |  templates
 |  |  |  ssh
-|  |  |  |  files
-|  |  |  |  tasks
-|  |  |  |  |  main.yaml
 |  |  playbook.yaml
 |  Vagrantfile
 ```
@@ -153,6 +142,13 @@ project_root
 ## 4. Ansible roles
 #### 4.1 PostgreSQL role
 To configure repmgr on PostgreSQL, we need to edit two well known PostgreSQL configuration files: `postgresql.conf` and `pg_hba.conf`. We will then write our tasks to apply the configurations on `tasks/main.yaml`. I named PostgreSQL role folder as postgres_12 so you can easily use another version if you want to.
+
+```
+postgres_12
+|  tasks
+|  |  main.yaml
+|  templates
+```
 
 ##### 4.1.1 User access configuration
 
@@ -175,7 +171,7 @@ host    repmgr        repmgr      {{ node2_ip }}/32       trust
 host    repmgr        repmgr      {{ node3_ip }}/32       trust
 ```
 
-#### 4.1.2 Database configuration
+##### 4.1.2 Database configuration
 
 In the same fashion as `pg_hba.conf`, you can reuse `postgresql.conf` default file and add a few more replication related settings on the bottom of the file:
 
@@ -231,9 +227,199 @@ These tasks will install PostgreSQL and apply our configurations. Their names ar
 
 #### 4.2 SSH server configuration
 
+```
+ssh
+|  files
+|  |  keys
+|  |   |  id_rsa
+|  |   |  id_rsa.pub
+|  tasks
+|  |  main.yaml
+```
+
+##### 4.2.1 SSH key pair
+Generate a key pair to use throughout our virtual machines to allow access into them. If you don't know how to do it, [this link can help][8]. Just make sure the keys file paths match the paths in the next step.
+
+##### 4.2.2 Task list
+These tasks will install OpenSSH server and apply our configurations. Their names are self-explanatory.
+
+```yaml
+- name: Install OpenSSH
+  apt:
+    name: openssh-server
+    update_cache: yes
+    state: present
+
+- name: Create postgres SSH directory
+  file:
+    mode: '0755'
+    owner: postgres
+    group: postgres
+    path: /var/lib/postgresql/.ssh/
+    state: directory
+
+- name: Copy SSH private key
+  copy:
+    src: "keys/id_rsa"
+    dest: /var/lib/postgresql/.ssh/id_rsa
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+- name: Copy SSH public key
+  copy:
+    src: "keys/id_rsa.pub"
+    dest: /var/lib/postgresql/.ssh/id_rsa.pub
+    owner: postgres
+    group: postgres
+    mode: '0644'
+
+- name: Add key to authorized keys file
+  authorized_key:
+    user: postgres
+    state: present
+    key: "{{ lookup('file', 'keys/id_rsa.pub') }}"
+
+- name: Restart SSH service
+  service:
+    name: sshd
+    enabled: yes
+    state: restarted
+```
+
 #### 4.3 repmgr installation
 
+```
+repmgr
+|  tasks
+|  |  main.yaml
+|  templates
+```
+
+##### 4.3.1 repmgr configuration
+We configure settings like promote command, follow command, timeouts and retry count on failure scenarios inside `repmgr.conf`. We will copy this file to its default directory `/etc` to avoid passing `-f` argument on `repmgr` command all the time.
+
+##### 4.3.2 Task list
+These tasks will install **repmgr** and apply our configurations. Their names are self-explanatory.
+
+```yaml
+- name: Download repmgr repository installer
+  get_url:
+    dest: /tmp/repmgr-installer.sh
+    mode: 0700
+    url: https://dl.2ndquadrant.com/default/release/get/deb
+
+- name: Execute repmgr repository installer
+  shell: /tmp/repmgr-installer.sh
+
+- name: Install repmgr for PostgreSQL {{ pg_version }}
+  apt:
+    name: postgresql-{{ pg_version }}-repmgr
+    update_cache: yes
+
+- name: Setup repmgr user and database
+  become_user: postgres
+  ignore_errors: yes
+  shell: |
+    createuser --replication --createdb --createrole --superuser repmgr &&
+    psql -c 'ALTER USER repmgr SET search_path TO repmgr_test, "$user", public;' &&
+    createdb repmgr --owner=repmgr
+
+- name: Copy repmgr configuration
+  template:
+    src: repmgr.conf.j2
+    dest: /etc/repmgr.conf
+
+- name: Restart PostgreSQL
+  systemd:
+    name: postgresql
+    enabled: yes
+    state: restarted
+
+```
+
 #### 4.4 repmgr node registration
+Finally we arrive to the moment where fault tolerance is established.
+
+```
+registration
+|  tasks
+|  |  main.yaml
+```
+
+##### 4.4.1 Task list
+This role was built accordingly to **repmgr** documentation and it might be the most complex role, as it needs to:
+- run some commands to run as root and others as postgres;
+- stop services between reconfigurations
+- have different tasks for primary, standby and supports [witness][9] role configuration, in case you want to have witnesses in your cluster (just assign `role: witness`)
+
+```yaml
+- name: Register primary node
+  become_user: postgres
+  shell: repmgr primary register
+  ignore_errors: yes
+  when: role == "primary"
+
+- name: Stop PostgreSQL
+  systemd:
+    name: postgresql
+    state: stopped
+  when: role == "standby"
+
+- name: Clean up PostgreSQL data directory
+  become_user: postgres
+  file:
+    path: /var/lib/postgresql/{{ pg_version }}/main
+    force: yes
+    state: absent
+  when: role == "standby"
+
+- name: Clone primary node data
+  become_user: postgres
+  shell: repmgr -h {{ node1_ip }} -U repmgr -d repmgr standby clone
+  ignore_errors: yes
+  when: role == "standby"
+
+- name: Start PostgreSQL
+  systemd:
+    name: postgresql
+    state: started
+  when: role == "standby"
+
+- name: Register {{ role }} node
+  become_user: postgres
+  shell: repmgr {{ role }} register -F
+  ignore_errors: yes
+  when: role != "primary"
+
+- name: Start repmgrd
+  become_user: postgres
+  shell: repmgrd
+  ignore_errors: yes
+```
+
+# group_vars/all.yaml
+
+```yaml
+client_ip: "172.16.1.1"
+node1_ip: "172.16.1.11"
+node2_ip: "172.16.1.12"
+node3_ip: "172.16.1.13"
+pg_version: "12"
+```
+
+# playbook.yaml
+```yaml
+---
+- hosts: all
+  gather_facts: yes
+  become: yes
+  roles:
+    - postgres_12
+    - ssh
+    - repmgr
+    - registration
+```
 
 # TODO: Link GitHub repo
 
@@ -244,3 +430,5 @@ These tasks will install PostgreSQL and apply our configurations. Their names ar
 [5]: https://www.vagrantup.com/docs/provisioning/ansible_local
 [6]: https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html#directory-layout
 [7]: https://docs.ansible.com/ansible/latest/user_guide/playbooks_templating.html
+[8]: https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent#generating-a-new-ssh-key
+[9]: https://repmgr.org/docs/current/repmgr-witness-register.html
