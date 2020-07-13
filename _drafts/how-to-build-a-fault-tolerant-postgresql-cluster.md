@@ -5,15 +5,19 @@ title: How to build a fault tolerant PostgreSQL cluster
 :elephant: :collision: :ok_hand:
 
 # Prologue
-- when developing, being close to production state is good
-- We were studying the alternatives
+Often I get asked if it's possible to build a resilient system with PostgreSQL. Considering resilience should feature cluster high availability, fault tolerance and self healing, it's not an easy answer, but there is a lot I could tell you on this.
+
+As of today, I can't achieve that level of resilience with the same ease as MongoDB built-in features. But let's see what we can in fact do with the help of **repmgr** and some other tooling.
 
 # Motivation
-- Vagrant for single command deployment
-- Ansible can be used for production
+What will this tutorial provide? In the end of this exercise, we will have things that come in handy, such as:
+- a few Ansible roles that can be reused for production
+- a Vagrantfile for single command cluster deployment
+- a more realistic development environment as when developing, being close to production state is good to foresee "production exclusive issues"
 
 # Objectives
-Build a local development environment PostgreSQL cluster with fault tolerance capabilites.
+- build a local development environment PostgreSQL cluster with fault tolerance capabilites
+- develop configuration management code to reuse in production
 
 # Pre-requisites
 Install [Vagrant][1], [VirtualBox][2] and [Ansible][3]
@@ -148,6 +152,8 @@ postgres_12
 |  tasks
 |  |  main.yaml
 |  templates
+|  |  pg_hba.conf.j2
+|  |  pg_hba.conf.j2
 ```
 
 ##### 4.1.1 User access configuration
@@ -294,6 +300,7 @@ repmgr
 |  tasks
 |  |  main.yaml
 |  templates
+|  |  repmgr.conf.j2
 ```
 
 ##### 4.3.1 repmgr configuration
@@ -347,6 +354,8 @@ registration
 |  |  main.yaml
 ```
 
+TODO: paste repmgr.conf.j2
+
 ##### 4.4.1 Task list
 This role was built accordingly to **repmgr** documentation and it might be the most complex role, as it needs to:
 - run some commands to run as root and others as postgres;
@@ -398,7 +407,8 @@ This role was built accordingly to **repmgr** documentation and it might be the 
   ignore_errors: yes
 ```
 
-# group_vars/all.yaml
+## 5. Set group variables
+Create a file `group_vars/all.yaml` to set your VMs IP addresses and the PostgreSQL version you would like to use. Like `host_vars` set on `Vagrantfile` these variables will be placed in the templates placeholders.
 
 ```yaml
 client_ip: "172.16.1.1"
@@ -408,9 +418,10 @@ node3_ip: "172.16.1.13"
 pg_version: "12"
 ```
 
-# playbook.yaml
+## 6. Put all pieces together with a playbook
+The only thing missing is the playbook itself. Create a file named `playbook.yaml` and invoke the roles we have been developing. `gather_facts` is an **Ansible** property to fetch operative system data like distribution (`ansible_distribution_release`) among other useful variables. You can also read these variables with [Ansible setup module][10].
+
 ```yaml
----
 - hosts: all
   gather_facts: yes
   become: yes
@@ -420,6 +431,55 @@ pg_version: "12"
     - repmgr
     - registration
 ```
+
+## 7. Start cluster
+It's finished. You can now start your cluster with `vagrant up` and when it's up perform your connections and failover tests.
+
+# Testing cluster failover
+Now that our cluster is up and configured, you can start by shutting down your standby node:
+```bash
+# save standby state and shut it down ungracefully
+vagrant suspend node2
+```
+You will see that the cluster is operating normally. Bring the standby node back and it will stay that way.
+```bash
+# bring standby back online after suspension
+vagrant resume node1
+```
+How about taking down primary node?
+```bash
+# save primary state and shut it down ungracefully
+vagrant suspend node1
+```
+
+At this point, as `repmgrd` is enabled, the standby node will retry connecting to primary node the configured number of times and, if it obtains no response, will promote itself to primary and take over write operations on PostgreSQL cluster. Success!
+
+To join the cluster again, the old primary node will have to lose its current data, clone the new primary data and register as a new standby.
+
+```bash
+vagrant resume node1
+vagrant ssh node1
+service postgresql stop
+rm -r /var/lib/postgresql/12/main
+repmgr -h 172.16.1.12 -U -d repmgr standby clone
+service postgresql start
+repmgr standby register -F
+repmgrd
+repmgr service status
+```
+
+This last command shows us that the cluster is working properly, but with inverted roles.
+TODO: paste output
+Nothing wrong with this, but let's see how to make these nodes switch their roles.
+
+```bash
+TODO: switchover commands
+```
+
+And we're back to the initial state.
+
+# Conclusion
+We managed to build a fault-tolerant PostgreSQL cluster using **Vagrant** and **Ansible**. High availability is a big challenge and like in a bunch of matters in life, we are only prepared for the biggest challenge when we are fitted in that big challenge conditions. Production environment unique problems are natural and tough to guess. Bridging the gap between development and production is a way prevent deployment/production issues. We can make some efforts regarding that question, and that is precisely what we just achieved with this high availability database setup.
 
 # TODO: Link GitHub repo
 
@@ -432,3 +492,4 @@ pg_version: "12"
 [7]: https://docs.ansible.com/ansible/latest/user_guide/playbooks_templating.html
 [8]: https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent#generating-a-new-ssh-key
 [9]: https://repmgr.org/docs/current/repmgr-witness-register.html
+[10]: https://docs.ansible.com/ansible/latest/modules/setup_module.html
