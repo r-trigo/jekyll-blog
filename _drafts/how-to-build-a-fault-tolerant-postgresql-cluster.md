@@ -354,7 +354,21 @@ registration
 |  |  main.yaml
 ```
 
-TODO: paste repmgr.conf.j2
+```yaml
+node_id = {{ node_id }}
+node_name = 'node{{ node_id }}'
+conninfo = 'host={{ connection_host }} user=repmgr dbname=repmgr'
+data_directory = '/var/lib/postgresql/{{ pg_version }}/main'
+use_replication_slots = yes
+reconnect_attempts = 5
+reconnect_interval = 1
+failover = automatic
+pg_bindir = '/usr/lib/postgresql/{{ pg_version }}/bin'
+promote_command = 'repmgr standby promote -f /etc/repmgr.conf'
+follow_command = 'repmgr standby follow -f /etc/repmgr.conf'
+log_level = INFO
+log_file = '/var/log/postgresql/repmgr.log'
+```
 
 ##### 4.4.1 Task list
 This role was built accordingly to **repmgr** documentation and it might be the most complex role, as it needs to:
@@ -452,7 +466,7 @@ How about taking down primary node?
 vagrant suspend node1
 ```
 
-At this point, as `repmgrd` is enabled, the standby node will retry connecting to primary node the configured number of times and, if it obtains no response, will promote itself to primary and take over write operations on PostgreSQL cluster. Success!
+At this point, as `repmgrd` is enabled, the standby node will retry connecting to primary node the configured number of times (`reconnect_attempts = 5`) and, if it obtains no response, will promote itself to primary and take over write operations on PostgreSQL cluster. Success!
 
 To join the cluster again, the old primary node will have to lose its current data, clone the new primary data and register as a new standby.
 
@@ -469,11 +483,21 @@ repmgr service status
 ```
 
 This last command shows us that the cluster is working properly, but with inverted roles.
-TODO: paste output
-Nothing wrong with this, but let's see how to make these nodes switch their roles.
+```bash
+postgres@node1:~$ repmgr service status
+ ID | Name  | Role    | Status    | Upstream | repmgrd | PID   | Paused? | Upstream last seen
+----+-------+---------+-----------+----------+---------+-------+---------+--------------------
+ 1  | node1 | primary | * running |          | running | 22490 | no      | n/a                
+ 2  | node2 | standby |   running | node1    | running | 22548 | no      | 0 second(s) ago   
+ 3  | node3 | witness |   running | node1    | running | 22535 | no      | 0 second(s) ago   
+```
+Nothing wrong with this, but let's see [how to make these nodes switch their roles][11].
 
 ```bash
-TODO: switchover commands
+# ssh in and out just to add host key to known_hosts file
+ssh <current_primary_ip_address> -o StrictHostKeyChecking=no
+# trigger switchover on current standby
+repmgr standby switchover --siblings-follow
 ```
 
 And we're back to the initial state.
@@ -493,3 +517,4 @@ We managed to build a fault-tolerant PostgreSQL cluster using **Vagrant** and **
 [8]: https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent#generating-a-new-ssh-key
 [9]: https://repmgr.org/docs/current/repmgr-witness-register.html
 [10]: https://docs.ansible.com/ansible/latest/modules/setup_module.html
+[11]: https://repmgr.org/docs/current/repmgr-standby-switchover.html
