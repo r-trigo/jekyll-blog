@@ -489,7 +489,7 @@ postgres@node1:~$ repmgr service status
 ----+-------+---------+-----------+----------+---------+-------+---------+--------------------
  1  | node1 | primary | * running |          | running | 22490 | no      | n/a                
  2  | node2 | standby |   running | node1    | running | 22548 | no      | 0 second(s) ago   
- 3  | node3 | witness |   running | node1    | running | 22535 | no      | 0 second(s) ago   
+ 3  | node3 | witness | * running | node1    | running | 22535 | no      | 0 second(s) ago   
 ```
 Nothing wrong with this, but let's see [how to make these nodes switch their roles][11].
 
