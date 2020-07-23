@@ -365,7 +365,7 @@ log_file = '/var/log/postgresql/repmgr.log'
 This role was built according to the `repmgr` documentation and it might be the most complex role, as it needs to:
 - run some commands as root and others as Postgres;
 - stop services between reconfigurations;
-- have different tasks for primary, standby, and support [witness][9] role configuration, in case you want to have witnesses in your cluster (just assign `role: witness`)
+- have different tasks for primary, standby, and support [witness][9] role configuration (in case you want node3 to also be a standby node, just assign `role: standby` in Vagrantfile `ansible.host_vars`)
 
 ```yaml
 - name: Register primary node
@@ -479,20 +479,29 @@ This last command shows us that the cluster is working properly, but with invert
 postgres@node1:~$ repmgr service status
  ID | Name  | Role    | Status    | Upstream | repmgrd | PID   | Paused? | Upstream last seen
 ----+-------+---------+-----------+----------+---------+-------+---------+--------------------
- 1  | node1 | primary | * running |          | running | 22490 | no      | n/a                
- 2  | node2 | standby |   running | node1    | running | 22548 | no      | 0 second(s) ago   
- 3  | node3 | witness | * running | node1    | running | 22535 | no      | 0 second(s) ago   
+ 1  | node1 | standby |   running | node2    | running | 22490 | no      | n/a                
+ 2  | node2 | primary | * running |          | running | 22548 | no      | 0 second(s) ago   
+ 3  | node3 | witness | * running | node2    | running | 22535 | no      | 0 second(s) ago   
 ```
-Nothing wrong with this, but let's see [how to make these nodes switch their roles][11].
+Nothing wrong with this, but let's [make these nodes switch their roles][11].
 
 ```bash
 # ssh in and out just to add host key to known_hosts file
 ssh <current_primary_ip_address> -o StrictHostKeyChecking=no
+exit
 # trigger switchover on current standby
 repmgr standby switchover --siblings-follow
 ```
 
 And we're back to the initial state.
+```bash
+postgres@node1:~$ repmgr service status
+ ID | Name  | Role    | Status    | Upstream | repmgrd | PID   | Paused? | Upstream last seen
+----+-------+---------+-----------+----------+---------+-------+---------+--------------------
+ 1  | node1 | primary | * running |          | running | 22490 | no      | n/a                
+ 2  | node2 | standby |   running | node1    | running | 22548 | no      | 0 second(s) ago   
+ 3  | node3 | witness | * running | node1    | running | 22535 | no      | 0 second(s) ago   
+```
 
 # Conclusion
 
