@@ -1,7 +1,10 @@
 ---
 layout: post
-title: How to build a fault tolerant PostgreSQL cluster
+title: How To Automate PostgreSQL and repmgr on Vagrant
+date: 2020-07-31 23:10 +0100
 ---
+>Originally published at [Jscrambler Blog](https://blog.jscrambler.com/how-to-automate-postgresql-and-repmgr-on-vagrant/)
+
 :elephant: :collision: :ok_hand:
 
 I often get asked if it's possible to build a resilient system with PostgreSQL.
@@ -525,3 +528,5 @@ Production environment unique problems are natural and tough to guess. Bridging 
 [10]: https://docs.ansible.com/ansible/latest/modules/setup_module.html
 [11]: https://repmgr.org/docs/current/repmgr-standby-switchover.html
 [12]: https://github.com/r-trigo/postgres-repmgr-vagrant
+
+<link rel="canonical" href="https://blog.jscrambler.com/how-to-automate-postgresql-and-repmgr-on-vagrant/" />
