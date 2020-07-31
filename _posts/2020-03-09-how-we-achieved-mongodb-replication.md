@@ -4,7 +4,9 @@ title: How we achieved MongoDB replication
 date: 2020-03-09 23:49 +0000
 categories: data devops docker mongodb
 ---
-# :leaves: :sheep: :whale:
+>Originally published at [Jscrambler Blog](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/)
+
+:leaves: :sheep: :whale:
 
 # Prologue
 

@@ -4,9 +4,9 @@ title: How to achieve Mongo replication on Docker
 date: 2020-04-05 18:44 +0100
 categories: data devops docker mongodb
 ---
-# :leaves: :sheep: :whale:
+>Originally published at [Jscrambler Blog](https://blog.jscrambler.com/how-to-achieve-mongo-replication-on-docker/)
 
-# Prologue
+:leaves: :sheep: :whale:
 
 In the [previous post](https://blog.jscrambler.com/how-we-achieved-mongodb-replication-on-docker/), we showed how we used MongoDB replication to solve several problems we were facing.
 
