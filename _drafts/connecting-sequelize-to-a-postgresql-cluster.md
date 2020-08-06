@@ -5,31 +5,45 @@ title: Connecting Sequelize to a PostgreSQL cluster
 :large_blue_diamond: :elephant: :sheep:
 
 ## Prologue
-
 In the [previous post][1] we showed how to automate a PostgreSQL fault-tolerant cluster with Vagrant and Ansible.
 
-This kind of setup makes our database cluster resilient to server failure and keeps the data available with no need for human interaction. What about apps? Are they fault-tolerant too? ORMs like Sequelize have [read replication][10] feature, which allows you to define your primary and standby nodes in the database connection.
+This kind of setup makes our database cluster resilient to server failure and keeps the data available with no need for human interaction. What about the apps using this database? Are they fault-tolerant too? ORMs like Sequelize have [read replication][2] features, which allows you to define your primary and standby nodes in the database connection. But what happens if your primary node, which is responsible for write operations, is offline and your app needs to continue saving data into your database?
 
-What happens if your primary node, which is responsible for write operations, is offline and your app needs to continue saving data into your database?
+One way to solve this is adding an extra layer to the system - a load balancing layer - using PostgreSQL 3rd party tools like [pgbouncer][3] or [Pgpool-II][4] or even a properly configured [HAproxy][5] instance. Besides the complexity brought by this solution, you could also be introducing an undesired [single point of failure][6].
 
-One way to solve this is adding an extra layer to the system - a load balancing layer - using PostgreSQL 3rd party tools like [pgbouncer][2] or [Pgpool-II][3] or even a properly configured [HAproxy][8] instance. Besides the complexity brought by this solution, you could also be introducing an undesired [single point of failure][9].
-
-Another way is using a floating IP address, or virtual IP address to assign to the current primary database node, so the application knows which node it must connect to when performing write operations.
+Another way is using a floating IP address/virtual IP address to assign to the current primary database node, so the application knows which node it must connect to when performing write operations even if another node takes up primary role.
 
 ## Objectives
 - connecting a **NodeJS** application with **Sequelize** to a **PostgreSQL** cluster in order to write from primary and read from standby nodes;
 - create and assign a **Digital Ocean Floating IP** (aka FLIP) to our current primary database node;
-- interact with **Digital Ocean CLI** to reassign FLIP to new primary node;
+- make **repmgr** interact with **Digital Ocean CLI** to reassign FLIP to new primary node on promotions;
 - keep this switchover transparent to the **NodeJS** application, so the whole system works without human help.
 
 ## Pre-requisites
-- **PostgreSQL** cluster with **repmgr** (you can follow the [tutorial][1] or just use a cluster with streaming replication and simulate failure + manual promotion)
-- **Digital Ocean** account and API token ([create an account][4])
-- [NodeJS][5] and [npm][6] installed (I'm using **NodeJS** v12 with **npm** v6)
+- **Digital Ocean** account and API token ([create an account][7])
+- **PostgreSQL** cluster with **repmgr** (you can grab the **Ansible** playbook in this [tutorial][1] to configure it or just use a cluster with streaming replication and simulate failure + manual promotion)
+- [NodeJS][8] and [npm][9] installed (I'm using **NodeJS** v12 with **npm** v6)
 - a **PostgreSQL** user with password authentication which accepts remote connections from your application host (I'll be using `postgres`:`123456`)
 
-## NodeJS application
-Let's write a simple app, which manipulates a `countries` table. Keep in mind [pluralization on Sequelize][7] for Javascript object and default database table names. Set it up with:
+## Step-by-step
+
+### Create your droplets
+![img](img)
+Create 3 droplets with preferably Ubuntu 20.04 operating system:
+- pg1 (primary)
+- pg2 (standby)
+- pg3 (witness)
+>If you'd like to use only 2 droplets, you can ignore the 3rd node as it will be an PostgreSQL witness
+
+### Assigning a floating IP to your
+![img2](img2)
+Create a floating IP address and assign it to your primary node (pg1).
+
+### Configure PostgreSQL with repmgr
+Use Ansible
+
+### NodeJS application
+Let's write a simple app, which manipulates a `countries` table. Keep in mind [pluralization in Sequelize][10] for Javascript objects and default database table names. Set it up with:
 
 ```bash
 mkdir sequelize-postgresql-cluster
@@ -43,10 +57,10 @@ Now edit `index.js` with the following:
 ```js
 const { Sequelize } = require('sequelize');
 
-const floating_ipv4 = '95.216.180.154'
-const primary_ipv4 = '172.16.1.11'
-const standby_ipv4 = '172.16.1.12'
+const primary_ipv4 = 'your_primary_ip_goes_here'
+const standby_ipv4 = 'your_standby_ip_goes_here'
 
+// new Sequelize(database, username, password)
 const sequelize = new Sequelize('postgres', 'postgres', '123456', {
   dialect: 'postgres',
   port: 5432,
@@ -77,7 +91,7 @@ async function connect() {
 }
 ```
 
-
+Test
 
 ```js
 // model
@@ -119,21 +133,30 @@ async function run() {
 run()
 ```
 
-## Normal situation test
+### (Optional) Current status primary failure test
+*If you perform this step you'll need to revert the PostgreSQL promotion and go back to cluster inital state. There are instructions for this in the [mentioned tutorial][1].*
 
-## Digital Ocean CLI configuration
+### Digital Ocean CLI configuration && Add script to repmgr promote command
+```js
+// insert this line
+const floating_ipv4 = 'your_floating_ip_goes_here'
+(...)
+// edit this line
+write: { host: floating_ipv4 }
+```
 
-## Add script to repmgr promote command
+## Final status primary failure test
 
-## Primary failure test
+## Conclusion
+Also works with other cloud providers.
 
 [1]: https://blog.jscrambler.com/how-to-automate-postgresql-and-repmgr-on-vagrant/
-[2]: https://m.do.co/c/x
+[2]: https://sequelize.org/master/manual/read-replication.html
 [3]: http://www.pgbouncer.org/
 [4]: https://wiki.postgresql.org/wiki/Pgpool-II
-[5]: https://nodejs.org/en/download/
-[6]: https://www.npmjs.com/
-[7]: https://sequelize.org/master/manual/model-basics.html
-[8]: http://www.haproxy.org/
-[9]: https://en.wikipedia.org/wiki/Single_point_of_failure
-[10]: https://sequelize.org/master/manual/read-replication.html
+[5]: http://www.haproxy.org/
+[6]: https://en.wikipedia.org/wiki/Single_point_of_failure
+[7]: https://m.do.co/c/x
+[8]: https://nodejs.org/en/download/
+[9]: https://www.npmjs.com/
+[10]: https://sequelize.org/master/manual/model-basics.html
