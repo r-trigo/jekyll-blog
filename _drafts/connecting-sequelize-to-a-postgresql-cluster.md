@@ -13,6 +13,8 @@ One way to solve this is adding an extra layer to the system - a load balancing 
 
 Another way is using a floating IP address/virtual IP address to assign to the current primary database node, so the application knows which node it must connect to when performing write operations even if another node takes up primary role.
 
+We will be using Digital Ocean for server creation and floating IP assignment, but the strategy also works with other cloud providers who support floating IP.
+
 ## Objectives
 - connecting a **NodeJS** application with **Sequelize** to a **PostgreSQL** cluster in order to write from primary and read from standby nodes;
 - create and assign a **Digital Ocean Floating IP** (aka FLIP) to our current primary database node;
@@ -35,8 +37,10 @@ Create 3 droplets with preferably Ubuntu 20.04 operating system:
 - pg2 (standby)
 - pg3 (witness)
 
-To make configurations run smoother, add your public SSH key when creating the droplets. You can also use the key pair I provided on [Github][98] for testing purposes.
+To make configurations run smoother, add your public SSH key when creating the droplets. You can also use the key pair I provided on [Github][12] for testing purposes.
 >If you'd like to use only 2 droplets, you can ignore the 3rd node as it will be an PostgreSQL witness
+
+*Note: If you use an SSH private key which is shared publicly on the internet, your cluster can get hacked.*
 
 ![jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-3-droplets](https://blog.jscrambler.com/content/images/2020/08/jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-3-droplets.png)
 
@@ -45,7 +49,7 @@ To make configurations run smoother, add your public SSH key when creating the d
 Create a floating IP address and assign it to your primary node (pg1).
 
 ### Configure PostgreSQL with repmgr
-As previously stated, you can use the [Ansible playbook from the last post][1] to speed up the configuration. Download it from [GitHub][99] and insert your gateway and droplets IPv4 addresses on `group_vars/all.yaml`:
+As previously stated, you can use the [Ansible playbook from the last post][1] to speed up the configuration. Download it from [GitHub][11] and insert your gateway and droplets IPv4 addresses on `group_vars/all.yaml`:
 
 ```yaml
 client_ip: "<your_gateway_public_ipv4>"
@@ -80,7 +84,7 @@ Now run the playbook with:
 ansible-playbook playbook.yaml -i digitalocean -e "ansible_ssh_user=root"
 ```
 - `-i` argument tells **Ansible** to run on the hosts we specified
-- `-e "ansible_ssh_user=root` passes an environment variable to make **Ansible** connect as `root` user
+- `-e "ansible_ssh_user=root"` passes an environment variable to make **Ansible** connect as `root` user
 
 ### NodeJS application
 Let's write a simple app, which manipulates a `countries` table. Keep in mind [pluralization in Sequelize][10] for Javascript objects and default database table names. Set it up with:
@@ -210,6 +214,8 @@ doctl auth init
 # insert Digital Ocean API token
 ```
 
+*Note: If using in production, secure the API token variable in Digital Ocean’s CLI configuration script and be careful with reassigning script permissions.*
+
 Place the script below on `/var/lib/postgresql/promote-standby.sh` with execution privileges. It promotes the standby node to primary, validates `doctl` project configuration and reassigns the floating IP to `pg2`.
 
 ```bash
@@ -257,13 +263,7 @@ Picture yourself in a boat on a river (yes, it's a Beatles reference). If both y
 
 In our specific case, before having a floating IP, your app would recover data read capability through database fault-tolerance behavior - but it wouldn't be able to perform writes in this condition. Now that your app follows the database's new primary node on automatic promotions, you can heal the cluster and revert it to the initial state in planned conditions and with no rush, as app features are safeguarded.
 
-## Final notes
-
-- This strategy also works with other cloud providers who support a floating IP.
-- If you use an SSH private key which is shared in GitHub, for example, your cluster can get hacked.
-- If using in production, secure the API token variable in Digital Ocean’s CLI configuration script and be careful with reassigning script permissions.
-- You can find the source code in this post [on GitHub][99].
-- Create your Digital Ocean account [here][7] to earn free credits.
+[You can find the source code in this post on GitHub][13].
 
 [1]: https://blog.jscrambler.com/how-to-automate-postgresql-and-repmgr-on-vagrant/
 [2]: https://sequelize.org/master/manual/read-replication.html
@@ -275,6 +275,6 @@ In our specific case, before having a floating IP, your app would recover data r
 [8]: https://nodejs.org/en/download/
 [9]: https://www.npmjs.com/
 [10]: https://sequelize.org/master/manual/model-basics.html
-
-[98]: https://github.com/r-trigo/postgres-repmgr-vagrant/tree/master/provisioning/roles/ssh/files/keys
-[99]: https://github.com/r-trigo/postgres-repmgr-vagrant
+[11]: https://github.com/r-trigo/postgres-repmgr-vagrant
+[12]: https://github.com/r-trigo/postgres-repmgr-vagrant/tree/master/provisioning/roles/ssh/files/keys
+[13]: https://github.com/r-trigo/sequelize-postgres-flip
