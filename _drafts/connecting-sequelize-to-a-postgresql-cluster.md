@@ -5,50 +5,57 @@ title: Connecting Sequelize to a PostgreSQL cluster
 :large_blue_diamond: :elephant: :sheep:
 
 ## Prologue
-In the [previous post][1] we showed how to automate a PostgreSQL fault-tolerant cluster with Vagrant and Ansible.
+In a [previous post][1] we showed how to automate a PostgreSQL fault-tolerant cluster with Vagrant and Ansible.
 
-This kind of setup makes our database cluster resilient to server failure and keeps the data available with no need for human interaction. What about the apps using this database? Are they fault-tolerant too? ORMs like Sequelize have [read replication][2] features, which allows you to define your primary and standby nodes in the database connection. But what happens if your primary node, which is responsible for write operations, is offline and your app needs to continue saving data on your database?
+This kind of setup makes our database cluster resilient to server failure and keeps the data available with no need for human interaction. But what about the apps using this database? Are they fault-tolerant too?
 
-One way to solve this is adding an extra layer to the system - a load balancing layer - using PostgreSQL 3rd party tools like [pgbouncer][3] or [Pgpool-II][4] or even a properly configured [HAproxy][5] instance. Besides the complexity brought by this method, you could also be introducing an undesired [single point of failure][6].
+ORMs like Sequelize have [read replication][2] features, which allows you to define your primary and standby nodes in the database connection. But what happens if your primary node, which is responsible for write operations, is offline and your app needs to continue saving data on your database?
 
-Another way is using a floating IP address/virtual IP address to assign to the current primary database node, so the application knows which node it must connect to when performing write operations even if another node takes up primary role.
+One way to solve this is by adding an extra layer to the system - a load balancing layer - using PostgreSQL third-party tools like [pgbouncer][3] or [Pgpool-II][4] or even a properly configured [HAproxy][5] instance. Besides the complexity brought by this method, you could also be introducing an undesired [single point of failure][6].
+
+Another way is using a floating IP address/virtual IP address to assign to the current primary database node, so the application knows which node it must connect to when performing write operations even if another node takes up the primary role.
 
 We will be using Digital Ocean for server creation and floating IP assignment, but the strategy also works with other cloud providers who support floating IP.
 
 ## Objectives
-- connecting a **NodeJS** application with **Sequelize** to a **PostgreSQL** cluster in order to write from primary and read from standby nodes;
+
+- connecting a **NodeJS** application with **Sequelize** to a **PostgreSQL** cluster in order to write to the primary node and read from standby nodes;
 - create and assign a **Digital Ocean Floating IP** (aka FLIP) to our current primary database node;
 - make **repmgr** interact with **Digital Ocean CLI** to reassign FLIP to new primary node on promotions;
 - keep this switchover transparent to the **NodeJS** application, so the whole system works without human help.
 
 ## Pre-requisites
-- **Digital Ocean** account and API token ([create an account using my referral to get free credits][7])
-- **PostgreSQL** cluster with **repmgr** on **Digital Ocean** (you can grab the **Ansible** playbook in this [tutorial][1] to configure it or just use a cluster with streaming replication and simulate failure + manual promotion)
-- [NodeJS][8] and [npm][9] installed (I'm using **NodeJS** v12 with **npm** v6)
-- a **PostgreSQL** user with password authentication which accepts remote connections from your application host (I'll be using `postgres`:`123456`)
+- a **Digital Ocean** account and API token ([create an account using my referral to get free credits][7])
+- a **PostgreSQL** cluster with **repmgr** on **Digital Ocean** (you can grab the **Ansible** playbook in this [tutorial][1] to configure it or just use a cluster with streaming replication and simulate failure + manual promotion);
+- [NodeJS][8] and [npm][9] installed (I'm using **NodeJS** v12 with **npm** v6);
+- a **PostgreSQL** user with password authentication which accepts remote connections from your application host (I'll be using `postgres`:`123456`).
 
-## Setup your cluster
+## Set up your cluster
 
 ### Create your droplets
 ![jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-droplet](https://blog.jscrambler.com/content/images/2020/08/jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-droplet.png)
 
-Create 3 droplets with preferably Ubuntu 20.04 operating system:
+Create 3 droplets, preferably with the Ubuntu 20.04 operating system:
 - pg1 (primary)
 - pg2 (standby)
 - pg3 (witness)
 
-To make configurations run smoother, add your public SSH key when creating the droplets. You can also use the key pair I provided on [Github][12] for testing purposes.
->If you'd like to use only 2 droplets, you can ignore the 3rd node as it will be an PostgreSQL witness
+To make configurations run smoother, add your public SSH key when creating the droplets. You can also use the key pair I provided on [GitHub][12] for testing purposes.
+
+>If you'd like to only use 2 droplets, you can ignore the third node as it will be a PostgreSQL witness.
 
 *Note: If you use an SSH private key which is shared publicly on the internet, your cluster can get hacked.*
 
 ![jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-3-droplets](https://blog.jscrambler.com/content/images/2020/08/jscrambler-blog-connecting-sequelize-to-postgresql-cluster-create-3-droplets.png)
 
-### Assign a floating IP to your current primary node
+### Assign a floating IP to your primary node
+
 ![jscrambler-blog-connecting-sequelize-to-postgresql-cluster-assign-floating-ip](https://blog.jscrambler.com/content/images/2020/08/jscrambler-blog-connecting-sequelize-to-postgresql-cluster-assign-floating-ip.png)
+
 Create a floating IP address and assign it to your primary node (pg1).
 
 ### Configure PostgreSQL with repmgr
+
 As previously stated, you can use the [Ansible playbook from the last post][1] to speed up the configuration. Download it from [GitHub][11] and insert your gateway and droplets IPv4 addresses on `group_vars/all.yaml`:
 
 ```yaml
@@ -59,12 +66,15 @@ node3_ip: "<droplet_pg3_ipv4>"
 pg_version: "12"
 ```
 *Note: I am assuming you will run your app locally on your computer and it will connect to your droplets through your network gateway*
+
 If you don't know your current public gateway address, you can run:
+
 ```bash
 curl ifconfig.io -4
 ```
 
 Create an **Ansible** inventory file and add the playbook `host_vars` for each host. I named mine `digitalocean`:
+
 ```
 [all]
 pg1 ansible_host=<droplet_pg1_ipv4> connection_host="<droplet_pg1_ipv4>" node_id=1 role="primary"
@@ -72,22 +82,25 @@ pg2 ansible_host=<droplet_pg2_ipv4> connection_host="<droplet_pg2_ipv4>" node_id
 pg3 ansible_host=<droplet_pg3_ipv4> connection_host="<droplet_pg3_ipv4>" node_id=3 role="witness"
 ```
 
-Add the droplets to the list of SSH known hosts accessing them and exiting the session:
+Add the droplets to the list of SSH known hosts:
+
 ```bash
 ssh root@<droplet_pg1_ipv4> exit
 ssh root@<droplet_pg2_ipv4> exit
 ssh root@<droplet_pg3_ipv4> exit
 ```
 
-Now run the playbook with:
+Now, run the playbook with:
+
 ```bash
 ansible-playbook playbook.yaml -i digitalocean -e "ansible_ssh_user=root"
 ```
 - `-i` argument tells **Ansible** to run on the hosts we specified
-- `-e "ansible_ssh_user=root"` passes an environment variable to make **Ansible** connect as `root` user
+- `-e "ansible_ssh_user=root”` passes an environment variable to make **Ansible** connect as the `root` user.
 
 ### NodeJS application
-Let's write a simple app, which manipulates a `countries` table. Keep in mind [pluralization in Sequelize][10] for Javascript objects and default database table names. Set it up with:
+
+Let's write a simple app that manipulates a `countries` table. Keep in mind [pluralization in Sequelize][10] for JavaScript objects and default database table names. Set it up with:
 
 ```bash
 mkdir sequelize-postgresql-cluster
@@ -96,7 +109,7 @@ npm init -y
 npm install pg sequelize
 ```
 
-Now edit `index.js` with the following:
+Now, edit the `index.js` with the following:
 
 ```js
 const { Sequelize } = require('sequelize');
@@ -135,7 +148,7 @@ async function connect() {
 }
 ```
 
-The code above created **Sequelize** connection object named `sequelize` and configured our servers addresses in it. The `connect` function tests the connection to the database. Make sure your app can connect to it correctly before proceeding.
+The code above created a **Sequelize** connection object named `sequelize` and configured our servers’ addresses in it. The `connect` function tests the connection to the database. Make sure your app can connect to it correctly before proceeding.
 
 ```js
 // model
@@ -177,22 +190,27 @@ async function run() {
 run()
 ```
 
-`Country` is our **Sequelize** model, a Javascript object which represents the database table.
-`create_table()`, `insertCountry()` and `findAllCountries()` functions are self-explanatory. They will be called through `run()` function.
+`Country` is our **Sequelize** model, a JavaScript object which represents the database table.
+`create_table()`, `insertCountry()` and `findAllCountries()` functions are self-explanatory. They will be called through the `run()` function.
+
 Run your app with:
+
 ```bash
 node index.js
 ```
-This will create the `countries` table on the **PostgreSQL** database, insert a row in it and read table data. Because of streaming replication, this data will automatically be replicated into the standby node.
+
+This will create the `countries` table on the **PostgreSQL** database, insert a row in it, and read table data. Because of streaming replication, this data will automatically be replicated into the standby node.
 
 ### **(Optional)** Current status primary failure test
 *If you perform this step, you'll need to revert the PostgreSQL promotion and go back to the cluster’s initial state. There are instructions for this in the [mentioned tutorial][1].*
 
-Turn off your `pg1` droplet (can be done through Digital Ocean interface). Due to `repmgrd` configuration, the standby node (`pg2`) promote itself to prymary role, so your database cluster keeps working. This promotion will make your app still able to read data, but not write. Proceed by reverting the cluster to the previous status, with `pg1` being the primary node.
+Turn off your `pg1` droplet (this can be done through Digital Ocean’s interface). Due to `repmgrd` configuration, the standby node (`pg2`) promotes itself to the primary role, so your database cluster keeps working. This promotion will make your app still able to read data, but not write. Proceed by reverting the cluster to the previous status, with `pg1` being the primary node.
 
 ## Use a floating IP
+
 ### Add the floating IP address to your app database connection object
-To take advantage of floating IP, insert it into a variable and edit the write object of `sequelize` object.
+
+To take advantage of floating IP, insert it into a variable and edit the write object of the `sequelize` object.
 
 ```js
 // insert this line
@@ -252,7 +270,8 @@ promote_command = '/var/lib/postgresql/promote-standby.sh'
 Run `service postgresql restart && repmgrd` to apply changes.
 
 ## Final status primary failure test
-Unlike before, when you turn off `pg1`, `pg2` not only promotes itself but also takes over the floating IP, which the app is currently using to perform write operations. As `pg2` was already in the `sequelize` variable `read` array, it is now capable and the sole responsible for data reads and writes. Wait a minute for the promotion to happen and test app again:
+
+Unlike before, when you turn off `pg1`, `pg2` not only promotes itself but also takes over the floating IP, which the app is currently using to perform write operations. As `pg2` was already in the `sequelize` variable’s `read` array, it is now capable and the sole responsible for data reads and writes. Wait a minute for the promotion to happen and test the app again:
 
 ```bash
 node index.js
