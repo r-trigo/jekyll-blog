@@ -45,8 +45,8 @@ more_content: |
 footer_show_references: false
 
 # Build settings
-#theme: minima
-theme: modern-resume-theme
+theme: minima
+#theme: modern-resume-theme
 darkmode: false
 plugins:
   - jekyll-feed
