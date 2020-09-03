@@ -1,8 +1,11 @@
 ---
 layout: post
 title: Connecting Sequelize to a PostgreSQL cluster
+date: 2020-09-03 21:16 +0100
 ---
 :large_blue_diamond: :elephant: :sheep:
+
+>Originally published at [Jscrambler Blog](https://blog.jscrambler.com/connecting-sequelize-to-a-postgresql-cluster/)
 
 ## Prologue
 In a [previous post][1] we showed how to automate a PostgreSQL fault-tolerant cluster with Vagrant and Ansible.
@@ -297,3 +300,5 @@ In our specific case, before having a floating IP, your app would recover data r
 [11]: https://github.com/r-trigo/postgres-repmgr-vagrant
 [12]: https://github.com/r-trigo/postgres-repmgr-vagrant/tree/master/provisioning/roles/ssh/files/keys
 [13]: https://github.com/r-trigo/sequelize-postgres-flip
+
+<link rel="canonical" href="https://blog.jscrambler.com/connecting-sequelize-to-a-postgresql-cluster/" />
