@@ -174,6 +174,38 @@ client.connect(function(err) {
 
 On the other side, if you will stick with [MongoDB Community][20], on v4.2 MongoDB started supporting [Client-Side Field Level Encryption][21]. Here is how it works: you generate the necessary keys and load them in your [database driver][22] (e.g. NodeJS MongoDB driver). Then you will be able to encrypt your data to store it in the database and decrypt it for your application to read it.
 
+Below you can find a Javascript code snippet showing data encryption and decryption happening on MongoDB NodeJS driver with the help of the npm package [mongodb-client-encryption][23].
+
+```js
+const unencryptedClient = new MongoClient(URL, { useUnifiedTopology: true });
+  try {
+    await unencryptedClient.connect();
+    const clientEncryption = new ClientEncryption(unencryptedClient, { kmsProviders, keyVaultNamespace });
+
+    async function encryptMyData(value) {
+      const keyId = await clientEncryption.createDataKey('local');
+      console.log("keyId", keyId);
+      return clientEncryption.encrypt(value, { keyId, algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic' });
+    }
+
+    async function decryptMyValue(value) {
+      return clientEncryption.decrypt(value);
+    }
+
+    const data2 = await encryptMyData("sensitive_data");
+    const mKey = key + 1;
+    const collection = unencryptedClient.db("test").collection('coll');
+    await collection.insertOne({ name: data2, key: mKey });
+    const a = await collection.findOne({ key: mKey });
+    console.log("encrypted:", a.name);
+    const decrypteddata = await decryptMyValue(a.name);
+    console.log("decrypted:", decrypteddata);
+
+  } finally {
+    await unencryptedClient.close();
+  }
+```
+
 ## Conclusion
 There is more to MongoDB security than what was mentioned in this post. Upgrading database and driver versions frequently, connecting a monitoring tool and keeping track of database access and configuration are also good ideas to increase security. Nevertheless, even if the system was theoretically entirely secured, they are always prone to human mistakes. Make sure the people working with you are conscious of the importance of keeping data secured. All users must take security seriously in order to secure a system. Security is everyone's job. Like in tandem kayaks, it is easier if everyone is paddling together in the same direction, with all efforts contributing to the same purpose.
 
@@ -203,9 +235,9 @@ Protect your database. Protect your code with Jscrambler.
 [20]: https://www.mongodb.com/try/download/community
 [21]: https://docs.mongodb.com/manual/core/security-client-side-encryption/
 [22]: https://docs.mongodb.com/drivers/
+[23]: https://www.npmjs.com/package/mongodb-client-encryption
 
 [99]: https://docs.mongodb.com/manual/administration/security-checklist/
 
 3. **TODO**: quero testar mongo authentication com x.509
 5. **TODO**: quero testar mongo driver com TLS
-6. **TODO**: inserir gridfs-test nodejs snippet
