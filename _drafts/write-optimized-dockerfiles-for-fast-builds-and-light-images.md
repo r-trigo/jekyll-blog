@@ -34,21 +34,24 @@ FROM debian
 COPY . /app
 RUN apt-get update
 RUN apt-get -y install openjdk-11-jdk ssh emacs
-CMD [“java”, “-jar”, “/app/target/app.jar”]
+CMD [“java”, “-jar”, “/app/target/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 Here, we may ask ourselves: **how long does it take to build** at this stage? To answer it, let's create this Dockerfile on our local development computer and tell Docker to build the image.
 
 ```bash
+# enter your Java app folder
+cd simple-java-maven-app-master
+# create a Dockerfile
 vim Dockerfile
 # write content, save and exit
 docker pull debian:latest # pull the source image
 time docker build --no-cache -t docker-class . # overwrite previous layers
 # notice the build time
 ```
-`0,21s user 0,16s system 0% cpu 1:49,47 total`
+`0,21s user 0,23s system 0% cpu 1:55,17 total`
 
-Here’s our answer: our build takes **1m49s** at this point.
+Here’s our answer: our build takes **1m55s** at this point.
 
 But what if we just enable BuildKit with no additional changes? Does it make a difference?
 
@@ -73,9 +76,9 @@ time DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
 ```bash
 DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
 ```
-`0,49s user 0,23s system 0% cpu 1:41,76 total`
+`0,54s user 0,93s system 1% cpu 1:43,00 total`
 
-On the same hardware, the build took ~8 seconds less than before. This means the build got ~7.34% faster with almost no effort.
+On the same hardware, the build took ~12 seconds less than before. This means the build got ~10,43% faster with almost no effort.
 
 But now let’s look at some extra steps we can take to improve our results even further.
 
@@ -88,7 +91,7 @@ FROM debian
 RUN apt-get update
 RUN apt-get -y install openjdk-11-jdk ssh emacs
 RUN COPY . /app
-CMD [“java”, “-jar”, “/app/target/app.jar”]
+CMD [“java”, “-jar”, “/app/target/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Avoid "COPY ."
@@ -98,8 +101,8 @@ Opt for more specific COPY arguments to limit cache busts. Only copy what’s ne
 FROM debian
 RUN apt-get update
 RUN apt-get -y install openjdk-11-jdk ssh vim
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Couple apt-get update & install
@@ -109,8 +112,8 @@ This prevents using an outdated package cache. Cache them together or do not cac
 FROM debian
 RUN apt-get update && \
     apt-get -y install openjdk-11-jdk ssh vim
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Remove unnecessary dependencies
@@ -121,8 +124,8 @@ FROM debian
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
     openjdk-11-jdk
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Remove package manager cache
@@ -134,8 +137,8 @@ RUN apt-get update && \
     apt-get -y install --no-install-recommends \
     openjdk-11-jdk && \
     rm -rf /var/lib/apt/lists/*
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Use official images where possible
@@ -143,8 +146,8 @@ There are some good reasons to use official images, such as reducing the time sp
 
 ```Dockerfile
 FROM openjdk
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Use specific tags
@@ -152,8 +155,8 @@ Don’t use `latest` as it’s a rolling tag. That’s asking for unpredictable 
 
 ```Dockerfile
 FROM openjdk:8
-COPY target/app.jar /app
-CMD [“java”, “-jar”, “/app/app.jar”]
+COPY target/my-app-1.0-SNAPSHOT.jar /app
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Look for minimal flavors
@@ -175,7 +178,7 @@ WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn -e -B package
-CMD [“java”, “-jar”, “/app/app.jar”]
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Fetch dependencies in a separate step
@@ -188,7 +191,7 @@ COPY pom.xml .
 RUN mvn -e -B dependency:resolve
 COPY src ./src
 RUN mvn -e -B package
-CMD [“java”, “-jar”, “/app/app.jar”]
+CMD [“java”, “-jar”, “/app/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### Multi-stage builds: remove build dependencies
@@ -207,10 +210,21 @@ COPY pom.xml .
 RUN mvn -e -B dependency:resolve
 COPY src ./src
 RUN mvn -e -B package
+
 FROM openjdk:8-jre-alpine
-COPY --from=builder /app/target/app.jar /
-CMD [“java”, “-jar”, “/app.jar”]
+COPY --from=builder /app/target/my-app-1.0-SNAPSHOT.jar /
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 ```
+
+#### Checkpoint
+If you build our application at this point,
+```bash
+time DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
+```
+
+`0,41s user 0,54s system 2% cpu 35,656 total`
+
+you'll notice our application takes **~35.66 seconds** to build. It's a pleasant improvement. From now on we will focus on the features for more possible scenarios.
 
 ### Multi-stage builds: different image flavors
 The Dockerfile below shows a different stage for a Debian and an Alpine based image.
@@ -219,12 +233,12 @@ The Dockerfile below shows a different stage for a Debian and an Alpine based im
 FROM maven:3.6-jdk-8-alpine AS builder
 …
 FROM openjdk:8-jre-jessie AS release-jessie
-COPY --from=builder /app/target/app.jar /
-CMD [“java”, “-jar”, “/app.jar”]
+COPY --from=builder /app/target/my-app-1.0-SNAPSHOT.jar /
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 
 FROM openjdk:8-jre-alpine AS release-alpine
-COPY --from=builder /app/target/app.jar /
-CMD [“java”, “-jar”, “/app.jar”]
+COPY --from=builder /app/target/my-app-1.0-SNAPSHOT.jar /
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 To build a specific image on a stage, we can use the `--target` argument:
@@ -239,8 +253,8 @@ ARG flavor=alpine
 FROM maven:3.6-jdk-8-alpine AS builder
 …
 FROM openjdk:8-jre-$flavor AS release
-COPY --from=builder /app/target/app.jar /
-CMD [“java”, “-jar”, “/app.jar”]
+COPY --from=builder /app/target/my-app-1.0-SNAPSHOT.jar /
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 The `ARG` command can control the image to be built. In the example above, we wrote `alpine` as default flavor, but we can pass `--build-arg flavor=<flavor>` on the `docker build` command.
@@ -263,9 +277,9 @@ FROM tiborvass/whalesay AS assets
 RUN whalesay “Hello DockerCon!” > out/assets.html
 
 FROM openjdk:8-jre-alpine AS release
-COPY --from=builder /app/app.jar /
+COPY --from=builder /app/my-app-1.0-SNAPSHOT.jar /
 COPY --from=assets /out /assets
-CMD [“java”, “-jar”, “/app.jar”]
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 And here is another Dockerfile where C and C++ libraries are separately compiled and take part in the `builder` stage later on.
@@ -307,8 +321,8 @@ RUN --mount=target=. --mount=type=cache,target /root/.m2 \
     && mvn package -DoutputDirectory=/
 
 FROM openjdk:8-jre-alpine
-COPY --from=builder /app/target/app.jar /
-CMD [“java”, “-jar”, “/app.jar”]
+COPY --from=builder /app/target/my-app-1.0-SNAPSHOT.jar /
+CMD [“java”, “-jar”, “/my-app-1.0-SNAPSHOT.jar”]
 ```
 
 ### BuildKit Secret Volumes
