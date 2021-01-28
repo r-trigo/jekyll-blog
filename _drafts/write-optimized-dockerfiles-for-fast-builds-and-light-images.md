@@ -1,32 +1,33 @@
 ---
 layout: post
-title: Write optimized Dockerfiles for fast builds and light images
+title: Dockerfile Optimization for Fast Builds and Light Images
 ---
 :pencil: :whale: :zap:
 
 ## Prologue
->Docker builds images automatically by reading the instructions from a Dockerfile -- a text file that contains all commands, in order, needed to build a given image.
+> Docker builds images automatically by reading the instructions from a Dockerfile -- a text file that contains all commands, in order, needed to build a given image.
 
-The explanation above was extracted from Docker [official docs][1] and summarizes what a Dockerfile is for. Dockerfiles are important to work with because they are our blueprint, our record of layers added to a Docker base image.
+The explanation above was extracted from Docker’s [official docs][1] and summarizes what a Dockerfile is for. Dockerfiles are important to work with because they are our blueprint, our record of layers added to a Docker base image.
 
-We will learn how to take advantage of [BuildKit][2] features, a set of enhancements introduced on Docker v18.09. Integrating BuildKit will give us better performance, storage management and security.
+We will learn how to take advantage of [BuildKit][2] features, a set of enhancements introduced on Docker v18.09. Integrating BuildKit will give us better performance, storage management, and security.
 
 ## Objectives
 - decrease build time;
 - reduce image size;
 - gain maintainability;
 - gain reproducibility;
-- understanding of multi-stage Dockerfiles;
-- understanding of BuildKit features.
+- understand multi-stage Dockerfiles;
+- understand BuildKit features.
 
 ## Pre-requisites
 - knowledge of Docker concepts
 - Docker installed (currently using v19.03)
+- a Java app (for this post I used a [sample Jenkins Maven app][3])
 
-## Let's get to it
+Let's get to it!
 
-### Simple Dockerfile example
-Below is an example of a Java unoptimized Dockerfile. We will walk through several optimization as we go.
+## Simple Dockerfile example
+Below is an example of an unoptimized Dockerfile containing a Java app. This example was taken from [this DockerCon conference talk][4]. We will walk through several optimizations as we go.
 
 ```Dockerfile
 FROM debian
@@ -36,8 +37,8 @@ RUN apt-get -y install openjdk-11-jdk ssh emacs
 CMD [“java”, “-jar”, “/app/target/app.jar”]
 ```
 
-### How long does it take to build at this stage?
-Excellent question, let's create this Dockerfile on our local development computer and tell Docker to build the image.
+Here, we may ask ourselves: **how long does it take to build** at this stage? To answer it, let's create this Dockerfile on our local development computer and tell Docker to build the image.
+
 ```bash
 vim Dockerfile
 # write content, save and exit
@@ -47,22 +48,28 @@ time docker build --no-cache -t docker-class . # overwrite previous layers
 ```
 `0,21s user 0,16s system 0% cpu 1:49,47 total`
 
-Our build takes 1m49s at this point.
+Here’s our answer: our build takes **1m49s** at this point.
 
-### What if we just enable BuildKit with no additional changes, does it make a difference?
-#### Enabling BuildKit
+But what if we just enable BuildKit with no additional changes? Does it make a difference?
+
+### Enabling BuildKit
+
 BuildKit can be enabled with two methods:
-1. set the DOCKER_BUILDKIT=1 environment variable when invoking the docker build command, such as:
+
+1. Setting the DOCKER_BUILDKIT=1 environment variable when invoking the Docker build command, such as:
+
 ```bash
 time DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
 ```
 
-2. enabling Docker BuildKit by default, set daemon configuration in `/etc/docker/daemon.json` feature to true and restart the daemon:
+2. Enabling Docker BuildKit by default, setting the daemon configuration in the `/etc/docker/daemon.json` feature to true, and restarting the daemon:
+
 ```json
 { "features": { "buildkit": true } }
 ```
 
-#### BuildKit initial impact
+#### BuildKit Initial Impact
+
 ```bash
 DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
 ```
@@ -70,8 +77,11 @@ DOCKER_BUILDKIT=1 docker build --no-cache -t docker-class .
 
 On the same hardware, the build took ~8 seconds less than before. This means the build got ~7.34% faster with almost no effort.
 
+But now let’s look at some extra steps we can take to improve our results even further.
+
 ### Order from least to most frequently changing
-Because order matters for caching, we'll move the `COPY` command more to the end.
+
+Because order matters for caching, we'll move the `COPY` command closer to the end of the Dockerfile.
 
 ```Dockerfile
 FROM debian
@@ -104,7 +114,7 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Remove unnecessary dependencies
-Don’t install debugging and editing tools, you can install them later when you feel the need for them.
+Don’t install debugging and editing tools—you can install them later when you feel you need them.
 
 ```Dockerfile
 FROM debian
@@ -116,6 +126,7 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Remove package manager cache
+
 Your image does not need this cache data. Take the chance to free some space.
 ```Dockerfile
 FROM debian
@@ -128,10 +139,7 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Use official images where possible
-Reasons to use official images:
-- reduce time spent on maintenance
-- reduce size
-- pre-configured for container use
+There are some good reasons to use official images, such as reducing the time spent on maintenance and reducing the size, as well as having an image that is pre-configured for container use.
 
 ```Dockerfile
 FROM openjdk
@@ -140,7 +148,7 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Use specific tags
-Don’t use `latest` as it’s a rolling tag. That is asking for unpredictable problems.
+Don’t use `latest` as it’s a rolling tag. That’s asking for unpredictable problems.
 
 ```Dockerfile
 FROM openjdk:8
@@ -149,7 +157,7 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Look for minimal flavors
-You can reduce base image size. Pick the lightest one that suits your purpose. Below is a short `openjdk` images list.
+You can reduce the base image size. Pick the lightest one that suits your purpose. Below is a short `openjdk` images list.
 
 | Repository | Tag | Size
 |-|-|-
@@ -158,8 +166,8 @@ You can reduce base image size. Pick the lightest one that suits your purpose. B
 | openjdk | 8-jre-slim | 204MB
 | openjdk | 8-jre-alpine | 83MB
 
-### Build from source in a consistent environment
-Maybe you do not need the whole JDK. If you intented to use JDK for Maven, you can use a Maven Docker image as base for your build.
+### Build from a source in a consistent environment
+Maybe you do not need the whole JDK. If you intended to use JDK for Maven, you can use a Maven Docker image as a base for your build.
 
 ```Dockerfile
 FROM maven:3.6-jdk-8-alpine
@@ -184,8 +192,9 @@ CMD [“java”, “-jar”, “/app/app.jar”]
 ```
 
 ### Multi-stage builds: remove build dependencies
-Why using multi-stage builds?
-- separate build from runtime environment
+
+Why use multi-stage builds?
+- separate the build from the runtime environment
 - DRY
 - different details on dev, test, lint specific environments
 - delinearizing dependencies (concurrency)
@@ -218,12 +227,13 @@ COPY --from=builder /app/target/app.jar /
 CMD [“java”, “-jar”, “/app.jar”]
 ```
 
-To build a specific image on a stage, we can use `--target` argument:
+To build a specific image on a stage, we can use the `--target` argument:
 ```bash
 time docker build --no-cache --target release-jessie .
 ```
 
 ### Different image flavors (DRY / global ARG)
+
 ```Dockerfile
 ARG flavor=alpine
 FROM maven:3.6-jdk-8-alpine AS builder
@@ -232,15 +242,20 @@ FROM openjdk:8-jre-$flavor AS release
 COPY --from=builder /app/target/app.jar /
 CMD [“java”, “-jar”, “/app.jar”]
 ```
-The `ARG` command can control the image to be built. In the example above we wrote `alpine` as default flavor, but we can pass `--build-arg flavor=<flavor>` on `docker build` command.
+
+The `ARG` command can control the image to be built. In the example above, we wrote `alpine` as default flavor, but we can pass `--build-arg flavor=<flavor>` on the `docker build` command.
+
 ```bash
 time docker build --no-cache --target release --build-arg flavor=jessie .
 ```
 
 ### Concurrency
-Concurrency is important when building Docker images as it takes better advantage from available CPU threads. In a linear Dockerfile, all stages are executed in sequence. With multi-stage builds, we can have smaller dependency stages be ready for the main stage to use them. BuildKit even brings another performance bonus. If stages are not used later in the build, they are directly skipped instead of processed and discarded when they finish. This means that in the stage graph representation, unneeded stages are not even considered.
+Concurrency is important when building Docker images as it takes the most advantage of available CPU threads. In a linear Dockerfile, all stages are executed in sequence. With multi-stage builds, we can have smaller dependency stages be ready for the main stage to use them.
 
-Below is an example Dockerfile where a website's assets are built in a `assets` stage:
+BuildKit even brings another performance bonus. If stages are not used later in the build, they are directly skipped instead of processed and discarded when they finish. This means that in the stage graph representation, unneeded stages are not even considered.
+
+Below is an example Dockerfile where a website's assets are built in an `assets` stage:
+
 ```Dockerfile
 FROM maven:3.6-jdk-8-alpine AS builder
 …
@@ -253,7 +268,7 @@ COPY --from=assets /out /assets
 CMD [“java”, “-jar”, “/app.jar”]
 ```
 
-And here is another Dockerfile where a C and a C++ libraries are separately compiled and take part in the `builder` stage later on.
+And here is another Dockerfile where C and C++ libraries are separately compiled and take part in the `builder` stage later on.
 
 ```Dockerfile
 FROM maven:3.6-jdk-8-alpine AS builder-base
@@ -283,7 +298,7 @@ BuildKit has a special feature regarding package managers cache. Here are some e
 | npm | ~/.npm
 | pip | ~/.cache/pip
 
-We can compare this Dockerfile with the on on **Build from source in a consistent environment**. This earlier Dockerfile didn't have a special cache handling. We can do that with a type of mount called cache: `--mount=type=cache`.
+We can compare this Dockerfile with the one presented in the section **Build from the source in a consistent environment**. This earlier Dockerfile didn't have special cache handling. We can do that with a type of mount called cache: `--mount=type=cache`.
 
 ```Dockerfile
 FROM maven:3.6-jdk-8-alpine AS builder
@@ -311,11 +326,7 @@ To build this Dockerfile, pass the `--secret` argument like this:
 docker build --secret id=aws,src=~/.aws/credentials
 ```
 
-The second scenario is a method to avoid commands like:
-```Dockerfile
-COPY ./keys/private.pem /root .ssh/private.pem
-```
-as we don't want our SSH keys to be stored on the Docker image after no longer being needed. BuildKit has a `ssh` mount type to cover that:
+The second scenario is a method to avoid commands like `COPY ./keys/private.pem /root .ssh/private.pem`, as we don't want our SSH keys to be stored on the Docker image after they are no longer needed. BuildKit has an `ssh` mount type to cover that:
 
 ```Dockerfile
 FROM alpine
@@ -324,19 +335,22 @@ RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 ARG REPO_REF=19ba7bcd9976ef8a9bd086187df19ba7bcd997f2
 RUN --mount=type=ssh,required git clone git@github.com:org/repo /work && cd /work && git checkout -b $REPO_REF
 ```
-To build this Dockerfile, you need to load your private SSH key into your `ssh-agent` and add `--ssh=default`, `default` being SSH private key location.
+To build this Dockerfile, you need to load your private SSH key into your `ssh-agent` and add `--ssh=default`, with `default` representing the SSH private key location.
+
 ```bash
 eval $(ssh-agent)
 ssh-add ~/.ssh/id_rsa # this is the SSH key default location
 docker build --ssh=default .
 ```
 
-## Disclaimer (Lima, onde/como colocamos esta salvaguarda?)
-The examples above was taken from [this DockerCon conference talk][99].
-
 ## Conclusion
-This concludes our demo on using Docker BuildKit to optimize your Dockerfiles and consequentially speed up your images build time. This speed gains save time and computational power, which should not be neglected. Like Charles Duhigg wrote on The Power of Habit: "*small victories are the consistent application of a small advantage*". You will definitely reap the benefits if you build good practices and habits.
+This concludes our demo on using Docker BuildKit to optimize your Dockerfiles and consequentially speed up your images’ build time.
+
+These speed gains result in much-needed savings in time and computational power, which should not be neglected.
+
+Like Charles Duhigg wrote on The Power of Habit: "*small victories are the consistent application of a small advantage*". You will definitely reap the benefits if you build good practices and habits.
 
 [1]: https://docs.docker.com/engine/reference/builder/
 [2]: https://docs.docker.com/engine/reference/builder/#buildkit
-[99]: https://youtu.be/JofsaZ3H1qM
+[3]: https://github.com/jenkins-docs/simple-java-maven-app
+[4]: https://youtu.be/JofsaZ3H1qM
