@@ -1,6 +1,7 @@
 ---
 layout: post
 title: Dockerfile Optimization for Fast Builds and Light Images
+date: 2021-02-18 18:51 +0000
 ---
 :pencil: :whale: :zap:
 
