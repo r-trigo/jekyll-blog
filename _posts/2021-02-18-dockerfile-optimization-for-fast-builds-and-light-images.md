@@ -5,6 +5,8 @@ date: 2021-02-18 18:51 +0000
 ---
 :pencil: :whale: :zap:
 
+>Originally published at [Jscrambler Blog](https://blog.jscrambler.com/dockerfile-optimization-for-fast-builds-and-light-images/)
+
 ## Prologue
 > Docker builds images automatically by reading the instructions from a Dockerfile -- a text file that contains all commands, in order, needed to build a given image.
 
@@ -369,3 +371,5 @@ Like Charles Duhigg wrote on The Power of Habit: "*small victories are the consi
 [2]: https://docs.docker.com/engine/reference/builder/#buildkit
 [3]: https://github.com/jenkins-docs/simple-java-maven-app
 [4]: https://youtu.be/JofsaZ3H1qM
+
+<link rel="canonical" href="https://blog.jscrambler.com/dockerfile-optimization-for-fast-builds-and-light-images/" />
