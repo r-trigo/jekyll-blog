@@ -1,8 +1,20 @@
 - layout: left
+  company: Talkdesk
+  link: talkdesk.com
+  job_title: Site Reliability Engineer
+  dates: June 2021 - Present
+  quote: >
+    Talkdesk is a cloud-based contact centre and artificial intelligence software provider
+  description: |
+    - Automate the creation and management of Talkdesk infrastructure
+    - Create mechanisms for maximum reliability and prevent potential harm/downtime
+    - Drive capacity and scalability planning
+
+- layout: left
   company: Jscrambler
   link: jscrambler.com
   job_title: DevOps Engineer
-  dates: June 2019 - Present
+  dates: June 2019 - June 2021
   quote: >
     Jscrambler is the Leading Solution for JavaScript In-App Protection and Real-Time Monitoring
   description: |
