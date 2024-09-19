@@ -252,22 +252,20 @@ GEM
       unf_ext
     unf_ext (0.0.7.7)
     unicode-display_width (1.7.0)
-    wdm (0.1.1)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  bundler (~> 2.1.4)
+  bundler
   github-pages
-  jekyll-compose (~> 0.12)
+  jekyll-compose
   jemoji
-  minima (~> 2.5)
-  modern-resume-theme (~> 1.8.8)
-  sassc (~> 2.4)
-  tzinfo (~> 1.2)
+  minitest
+  modern-resume-theme
+  sassc
+  tzinfo
   tzinfo-data
-  wdm (~> 0.1.1)
 
 BUNDLED WITH
    2.1.4
