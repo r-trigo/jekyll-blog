@@ -1,10 +1,10 @@
-repository: https://github.com/r-trigo/rt-jekyll-site
+repository: https://github.com/r-trigo/jekyll-blog
 
-name: RT Jekyll Site
+name: Jekyll Blog
 title: A DevOps Blog
 email: ruimigueltrigo[at]gmail.com
 description: >-
-  Welcome to RT Jekyll Site. Here you can find my writing work as well as professional info about me.
+  Welcome to my Jekyll Blog. Here you can find my writing work as well as professional info about me.
 
 dev_username: rtrigo
 github_username:  r-trigo
@@ -15,8 +15,9 @@ stackoverflow_username: "6460173"
 twitter_username: "ru1tr1go"
 
 # comment for local development
-baseurl: "/rt-jekyll-site/"
-#url: "r-trigo.github.io"
+domain: r-trigo.github.io       # if you want to force HTTPS, specify the domain without the http at the start, e.g. example.com
+url: https://r-trigo.github.io  # the base hostname and protocol for your site, e.g. http://example.com
+baseurl: /jekyll-blog/          # place folder name if the site is served in a subfolder
 
 # About Section
 # about_title: About Me (Use this to override about section title)
@@ -24,7 +25,7 @@ about_profile_image: assets/images/profile.jpg
 about_content: |
   Computer engineer and Mobile Computing master.
   Graduated from Escola Superior de Tecnologia e Gestão of Instituto Politécnico da Guarda.
-  AWS (CCP), Cisco (CCNA and CCNA Security) and Linux certified (Linux essentials and LPIC-1).
+  AWS (CCP), Cisco (CCNA and CCNA Security), Hashicorp (Terraform Associate), Kubernetes (CKA) and Linux certified (Linux essentials and LPIC-1).
   Passioned by martial arts and using technology in order to improve the world.
   Also loves a good get-together. Computer experience started in 2009.
 
@@ -41,13 +42,12 @@ experience_title: What I Do
 # More Section
 more_title: My Interests
 more_content: |
-  Martial Arts  |  Fitness  |  Reading  |  IoT
+  Martial Arts  |  Non-fiction books  |  HomeLabbing
 # Footer
 footer_show_references: false
 
 # Build settings
-theme: minima
-#theme: modern-resume-theme
+theme: modern-resume-theme
 darkmode: false
 plugins:
   - jekyll-feed
