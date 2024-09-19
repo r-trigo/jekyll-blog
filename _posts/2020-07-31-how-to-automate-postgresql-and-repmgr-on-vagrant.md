@@ -281,7 +281,10 @@ The tasks below will install the OpenSSH server and apply our configurations. Th
   authorized_key:
     user: postgres
     state: present
+{%- raw -%}
     key: "{{ lookup('file', 'keys/id_rsa.pub') }}"
+    
+{% endraw %}
 
 - name: Restart SSH service
   service:
