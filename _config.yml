@@ -47,7 +47,7 @@ more_content: |
 footer_show_references: false
 
 # Build settings
-theme: modern-resume-theme
+remote_theme: sproogen/modern-resume-theme
 darkmode: false
 plugins:
   - jekyll-feed
